@@ -1,0 +1,45 @@
+
+{
+  "name": "Viyabaari - Tamil Business Manager",
+  "short_name": "Viyabaari",
+  "description": "Easy Tamil accounting & inventory app. Manage stock with photos, track income/expenses, and view AI insights.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "lang": "ta",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "display_override": ["window-controls-overlay", "minimal-ui"],
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Transaction",
+      "short_name": "Entries",
+      "url": "/",
+      "icons": [{ "src": "https://ui-avatars.com/api/?name=Tx&background=4f46e5&color=fff&size=192&rounded=true", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}
