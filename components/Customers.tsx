@@ -250,7 +250,18 @@ export default function Customers({ user, language, onBack }: CustomersProps) {
       html2canvas: { 
         scale: 2, 
         useCORS: true, 
-        letterRendering: true 
+        letterRendering: true,
+        width: 800,
+        windowWidth: 800,
+        onclone: (clonedDoc: Document) => {
+          const el = clonedDoc.getElementById('pdf-statement-content');
+          if (el) {
+            el.style.display = 'block';
+            el.style.width = '800px';
+            el.style.padding = '24px';
+            el.style.background = '#ffffff';
+          }
+        }
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };

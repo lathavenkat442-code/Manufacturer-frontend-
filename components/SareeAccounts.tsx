@@ -574,6 +574,8 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
         scale: 1.5, 
         useCORS: true, 
         logging: false,
+        width: 800,
+        windowWidth: 800,
         onclone: (clonedDoc: Document) => {
           const el = clonedDoc.getElementById(`pdf-loom-statement-${loom.id}`);
           if (el) {

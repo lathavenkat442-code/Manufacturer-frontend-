@@ -76,6 +76,54 @@
         html.dark .sidebar-container img {
             filter: none;
         }
+
+        /* Print styling for clean A4 sheet output */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .print\:hidden {
+                display: none !important;
+            }
+            @page {
+                size: A4 portrait;
+                margin: 10mm 12mm 10mm 12mm;
+            }
+            /* Guarantee standard tables fit full printable width of page */
+            #pdf-statement-content,
+            #pdf-supplier-statement,
+            #pdf-warper-statement,
+            #pdf-statement-accounting,
+            [id^="pdf-loom-statement-"],
+            .max-w-4xl {
+                display: block !important;
+                overflow: visible !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .overflow-x-auto, .overflow-auto {
+                overflow: visible !important;
+                display: block !important;
+            }
+            table {
+                width: 100% !important;
+                page-break-inside: auto;
+            }
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            thead {
+                display: table-header-group;
+            }
+        }
     </style>
 <script type="importmap">
 {

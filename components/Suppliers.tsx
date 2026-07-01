@@ -279,7 +279,18 @@ const Suppliers: React.FC<SuppliersProps> = ({ user, language, onBack }) => {
       html2canvas: { 
         scale: 2, 
         useCORS: true, 
-        letterRendering: true 
+        letterRendering: true,
+        width: 800,
+        windowWidth: 800,
+        onclone: (clonedDoc: Document) => {
+          const el = clonedDoc.getElementById('pdf-supplier-statement');
+          if (el) {
+            el.style.display = 'block';
+            el.style.width = '800px';
+            el.style.padding = '24px';
+            el.style.background = '#ffffff';
+          }
+        }
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
@@ -334,7 +345,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ user, language, onBack }) => {
         </div>
 
         <div className="max-w-4xl mx-auto border border-zinc-100 rounded-[2.5rem] p-8 shadow-sm bg-white print:border-none print:p-0">
-          <div ref={statementRef}>
+          <div ref={statementRef} id="pdf-supplier-statement">
             <div className="text-center mb-10 border-b-2 border-zinc-900 pb-8">
               <h1 className="text-3xl font-black text-zinc-900 mb-2 uppercase tracking-tight">{language === 'ta' ? 'சப்ளையர் கணக்கு அறிக்கை' : 'Supplier Account Statement'}</h1>
               <div className="flex flex-col items-center gap-1">

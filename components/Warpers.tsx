@@ -1633,7 +1633,18 @@ const Warpers: React.FC<WarpersProps> = ({
       html2canvas: { 
         scale: 2, 
         useCORS: true, 
-        letterRendering: true 
+        letterRendering: true,
+        width: 800,
+        windowWidth: 800,
+        onclone: (clonedDoc: Document) => {
+          const el = clonedDoc.getElementById('pdf-warper-statement');
+          if (el) {
+            el.style.display = 'block';
+            el.style.width = '800px';
+            el.style.padding = '24px';
+            el.style.background = '#ffffff';
+          }
+        }
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
@@ -2082,7 +2093,7 @@ const Warpers: React.FC<WarpersProps> = ({
         </div>
 
         <div className="max-w-4xl mx-auto border border-zinc-100 rounded-[2.5rem] p-8 shadow-sm bg-white print:border-none print:p-0">
-          <div ref={statementRef}>
+          <div ref={statementRef} id="pdf-warper-statement">
             <div className="text-center mb-10 border-b-2 border-zinc-900 pb-8">
               <h1 className="text-3xl font-black text-zinc-900 mb-2 uppercase tracking-tight">{language === 'ta' ? 'வார்ப்புகாரர் கணக்கு அறிக்கை' : 'Warper Account Statement'}</h1>
               <div className="flex flex-col items-center gap-1">
@@ -2516,20 +2527,18 @@ const Warpers: React.FC<WarpersProps> = ({
               const downloadPDF = async () => {
                 if (!statementRef.current) return;
                 
-                // Increase the scale factor for the PDF relative to the screen
-                const pdfScale = 2.5; 
-                // Recalculate widths for the PDF specifically
+                // Use natural column widths to ensure perfect alignment and absolutely no text wrapping
                 const pdfColWidths = {
-                  date: (columnWidths['date'] || 70) * pdfScale,
-                  sno: (columnWidths['sno'] || 40) * pdfScale,
-                  particulars: (columnWidths['particulars'] || 150) * pdfScale,
-                  ends: (columnWidths['ends'] || 50) * pdfScale,
-                  meters: (columnWidths['meters'] || 50) * pdfScale
+                  date: columnWidths['date'] || 90,
+                  sno: columnWidths['sno'] || 45,
+                  particulars: columnWidths['particulars'] || 180,
+                  ends: columnWidths['ends'] || 55,
+                  meters: columnWidths['meters'] || 55
                 };
                 
                 const pdfDenierWidths: Record<string, number> = {};
                 allDenierColors.forEach(dc => {
-                  pdfDenierWidths[dc] = (columnWidths[dc] || baseColumnWidth) * pdfScale;
+                  pdfDenierWidths[dc] = columnWidths[dc] || baseColumnWidth;
                 });
 
                 const pdfTotalTableWidth = pdfColWidths.date + pdfColWidths.sno + pdfColWidths.particulars + 
@@ -2537,15 +2546,25 @@ const Warpers: React.FC<WarpersProps> = ({
                                          allDenierColors.reduce((sum, dc) => sum + pdfDenierWidths[dc], 0);
 
                 const element = statementRef.current;
-                const captureWidth = pdfTotalTableWidth + 60; // Thinner padding for efficiency
+                const captureWidth = pdfTotalTableWidth + 60; // 30px padding on left/right for elegant spacing
                 const filename = `${selectedWarper.name}_statement_${new Date().toISOString().split('T')[0]}.pdf`;
                 
+                const isLandscape = allDenierColors.length > 5;
+                const marginPoints = 20; // 20pt margin (~7mm)
+                
+                // Convert captureWidth (pixels) to points. 1 px = 0.75 points
+                const pageWidthPoints = (captureWidth * 0.75) + (marginPoints * 2);
+                
+                // Keep the classic A4 proportional aspects (landscape 1.414, portrait 0.707)
+                const aspectRatio = isLandscape ? 1.414 : 0.707;
+                const pageHeightPoints = pageWidthPoints / aspectRatio;
+
                 const opt = {
-                  margin: [10, 10] as [number, number],
+                  margin: marginPoints,
                   filename: filename,
                   image: { type: 'jpeg' as const, quality: 0.95 }, // JPEG is much smaller than PNG
                   html2canvas: { 
-                    scale: 1.5, // Reduced from 4 to 1.5 for performance and size (tiny loss in zoom detail, massive gain in file size)
+                    scale: 2.0, // Set to 2.0 for high resolution print output
                     useCORS: true, 
                     letterRendering: true,
                     width: captureWidth,
@@ -2554,6 +2573,7 @@ const Warpers: React.FC<WarpersProps> = ({
                     scrollY: 0,
                     onclone: (clonedDoc: Document) => {
                       clonedDoc.body.style.width = `${captureWidth}px`;
+                      clonedDoc.body.style.maxWidth = 'none';
                       clonedDoc.body.style.overflow = 'visible';
                       clonedDoc.body.style.setProperty('-webkit-font-smoothing', 'antialiased');
                       clonedDoc.body.style.setProperty('text-rendering', 'optimizeLegibility');
@@ -2563,10 +2583,34 @@ const Warpers: React.FC<WarpersProps> = ({
                         el.style.display = 'block';
                         el.style.width = `${captureWidth}px`;
                         el.style.minWidth = `${captureWidth}px`;
+                        el.style.maxWidth = 'none';
                         el.style.padding = '25px';
                         el.style.backgroundColor = '#ffffff';
                         el.style.color = '#000';
                         el.style.fontFamily = 'ui-sans-serif, system-ui, sans-serif';
+                        
+                        // Force all parent elements in the clone to allow full width without cropping
+                        let parent = el.parentElement;
+                        while (parent && parent !== clonedDoc.body) {
+                          if (parent instanceof HTMLElement) {
+                            parent.style.width = `${captureWidth}px`;
+                            parent.style.minWidth = `${captureWidth}px`;
+                            parent.style.maxWidth = 'none';
+                            parent.style.overflow = 'visible';
+                          }
+                          parent = parent.parentElement;
+                        }
+
+                        // Force table container wrapper to not scroll and be fully visible
+                        const wrappers = el.querySelectorAll('.overflow-x-auto, .overflow-auto');
+                        wrappers.forEach(w => {
+                          if (w instanceof HTMLElement) {
+                            w.style.overflow = 'visible';
+                            w.style.overflowX = 'visible';
+                            w.style.width = '100%';
+                            w.style.maxWidth = 'none';
+                          }
+                        });
                         
                         // 1. Header Styling - Professional Angel One inspired
                         const topSection = el.querySelector('.mb-8.border-b-2');
@@ -2670,7 +2714,7 @@ const Warpers: React.FC<WarpersProps> = ({
                       }
                     }
                   },
-                  jsPDF: { unit: 'mm', format: 'a4', orientation: (allDenierColors.length > 5 ? 'landscape' : 'portrait') as 'landscape' | 'portrait' }
+                  jsPDF: { unit: 'pt', format: [pageWidthPoints, pageHeightPoints] as [number, number], orientation: isLandscape ? 'landscape' as const : 'portrait' as const }
                 };
 
                 try {
