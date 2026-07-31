@@ -2562,9 +2562,9 @@ const Warpers: React.FC<WarpersProps> = ({
                 const opt = {
                   margin: marginPoints,
                   filename: filename,
-                  image: { type: 'jpeg' as const, quality: 0.95 }, // JPEG is much smaller than PNG
+                  image: { type: 'jpeg' as const, quality: 0.98 },
                   html2canvas: { 
-                    scale: 2.0, // Set to 2.0 for high resolution print output
+                    scale: 2.5, 
                     useCORS: true, 
                     letterRendering: true,
                     width: captureWidth,
@@ -2586,8 +2586,9 @@ const Warpers: React.FC<WarpersProps> = ({
                         el.style.maxWidth = 'none';
                         el.style.padding = '25px';
                         el.style.backgroundColor = '#ffffff';
-                        el.style.color = '#000';
-                        el.style.fontFamily = 'ui-sans-serif, system-ui, sans-serif';
+                        el.style.color = '#000000';
+                        el.style.fontFamily = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                        el.style.fontWeight = '800';
                         
                         // Force all parent elements in the clone to allow full width without cropping
                         let parent = el.parentElement;
@@ -2612,31 +2613,31 @@ const Warpers: React.FC<WarpersProps> = ({
                           }
                         });
                         
-                        // 1. Header Styling - Professional Angel One inspired
+                        // 1. Header Styling - High contrast bold black text for sharp printouts
                         const topSection = el.querySelector('.mb-8.border-b-2');
                         if (topSection instanceof HTMLElement) {
                           topSection.style.marginBottom = '15px';
                           topSection.style.paddingBottom = '10px';
-                          topSection.style.borderBottom = '3px solid #000';
+                          topSection.style.borderBottom = '3px solid #000000';
                           topSection.innerHTML = `
                             <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
                               <div>
-                                <h1 style="font-size: 24px; font-weight: 900; color: #000; margin: 0; text-transform: uppercase; letter-spacing: -0.5px;">
+                                <h1 style="font-size: 26px; font-weight: 900; color: #000000; margin: 0; text-transform: uppercase; letter-spacing: -0.5px;">
                                   ${language === 'ta' ? 'வார்ப்புகாரர் கணக்கு அறிக்கை' : 'Warper Ledger Statement'}
                                 </h1>
-                                <div style="display: flex; gap: 15px; margin-top: 5px;">
+                                <div style="display: flex; gap: 15px; margin-top: 6px;">
                                   <div style="display: flex; flex-direction: column;">
-                                    <span style="font-size: 10px; font-weight: 800; color: #666; text-transform: uppercase;">${language === 'ta' ? 'வார்ப்புகாரர்' : 'Warper'}</span>
-                                    <span style="font-size: 18px; font-weight: 800; color: #000;">${selectedWarper.name}</span>
+                                    <span style="font-size: 11px; font-weight: 900; color: #000000; text-transform: uppercase;">${language === 'ta' ? 'வார்ப்புகாரர்' : 'Warper'}</span>
+                                    <span style="font-size: 19px; font-weight: 900; color: #000000;">${selectedWarper.name}</span>
                                   </div>
-                                  ${selectedWarper.phone ? `<div style="width: 1px; background: #ddd;"></div><div style="display: flex; flex-direction: column;"><span style="font-size: 10px; font-weight: 800; color: #666; text-transform: uppercase;">Phone</span><span style="font-size: 18px; font-weight: 800; color: #000;">${selectedWarper.phone}</span></div>` : ''}
+                                  ${selectedWarper.phone ? `<div style="width: 2px; background: #000000;"></div><div style="display: flex; flex-direction: column;"><span style="font-size: 11px; font-weight: 900; color: #000000; text-transform: uppercase;">Phone</span><span style="font-size: 19px; font-weight: 900; color: #000000;">${selectedWarper.phone}</span></div>` : ''}
                                 </div>
                               </div>
                               <div style="text-align: right;">
-                                <div style="font-size: 16px; font-weight: 800; color: #000; background: #f4f4f5; padding: 5px 12px; border-radius: 4px; display: inline-block;">
+                                <div style="font-size: 16px; font-weight: 900; color: #000000; background: #e5e7eb; padding: 6px 14px; border-radius: 4px; border: 1.5px solid #000000; display: inline-block;">
                                   ${isAll ? (language === 'ta' ? 'அனைத்து டீனியர்கள்' : 'All Deniers') : `${selectedDeniers.join(', ')} DENIER`}
                                 </div>
-                                <div style="font-size: 12px; font-weight: 700; color: #666; margin-top: 4px;">
+                                <div style="font-size: 13px; font-weight: 900; color: #000000; margin-top: 6px;">
                                   Generated: ${new Date().toLocaleDateString()}
                                 </div>
                               </div>
@@ -2644,25 +2645,26 @@ const Warpers: React.FC<WarpersProps> = ({
                           `;
                         }
 
-                        // 2. Table Scaling and Formatting
+                        // 2. Table Scaling and Formatting - High contrast crisp bold black letters
                         const table = el.querySelector('table');
                         if (table instanceof HTMLElement) {
                           table.style.width = '100%';
                           table.style.borderCollapse = 'collapse';
                           table.style.tableLayout = 'fixed';
-                          table.style.border = '1px solid #000';
+                          table.style.border = '2px solid #000000';
                           table.style.fontSize = '12px';
-                          table.style.color = '#000';
+                          table.style.color = '#000000';
+                          table.style.fontWeight = '800';
 
                           const ths = table.querySelectorAll('th');
                           ths.forEach((th, i) => {
                             if (th instanceof HTMLElement) {
                               th.style.padding = '8px 5px';
-                              th.style.border = '1px solid #000';
-                              th.style.backgroundColor = '#f4f4f5';
-                              th.style.color = '#000';
+                              th.style.border = '1.5px solid #000000';
+                              th.style.backgroundColor = '#e5e7eb';
+                              th.style.color = '#000000';
                               th.style.fontWeight = '900';
-                              th.style.fontSize = '11px';
+                              th.style.fontSize = '12px';
                               th.style.textTransform = 'uppercase';
                               
                               if (i === 0) th.style.width = `${pdfColWidths.date}px`;
@@ -2680,32 +2682,48 @@ const Warpers: React.FC<WarpersProps> = ({
                           const tds = table.querySelectorAll('td');
                           tds.forEach((td) => {
                             if (td instanceof HTMLElement) {
-                              td.style.padding = '6px 5px';
-                              td.style.border = '1px solid #e5e7eb';
-                              td.style.fontWeight = '600';
-                              td.style.color = '#000';
+                              td.style.padding = '7px 5px';
+                              td.style.border = '1px solid #333333';
+                              td.style.fontWeight = '800';
+                              td.style.color = '#000000';
                               if (td.classList.contains('whitespace-normal')) {
                                 td.style.lineHeight = '1.3';
                               }
                             }
                           });
 
-                          const trs = table.querySelectorAll('tr');
+                          // Ensure all child text elements in the table use bold black text
+                          const allChildElements = table.querySelectorAll('*');
+                          allChildElements.forEach(child => {
+                            if (child instanceof HTMLElement) {
+                              child.style.color = '#000000';
+                              child.style.fontWeight = '800';
+                              child.style.opacity = '1.0';
+                            }
+                          });
+
+                          const trs = table.querySelectorAll('tbody tr');
                           trs.forEach((tr, idx) => {
-                             if (idx > 0 && idx % 2 === 0) {
-                               tr.style.backgroundColor = '#fafafa';
+                             if (tr instanceof HTMLElement) {
+                               if (idx % 2 === 1) {
+                                 tr.style.backgroundColor = '#f4f4f5';
+                               } else {
+                                 tr.style.backgroundColor = '#ffffff';
+                               }
                              }
                           });
 
                           const tfoot = table.querySelector('tfoot');
                           if (tfoot instanceof HTMLElement) {
+                            tfoot.style.backgroundColor = '#000000';
                             const footTds = tfoot.querySelectorAll('td');
                             footTds.forEach(ftd => {
                               if (ftd instanceof HTMLElement) {
-                                ftd.style.backgroundColor = '#f4f4f5';
-                                ftd.style.color = '#000';
+                                ftd.style.backgroundColor = '#000000';
+                                ftd.style.color = '#ffffff';
                                 ftd.style.fontWeight = '900';
-                                ftd.style.border = '1px solid #000';
+                                ftd.style.fontSize = '12.5px';
+                                ftd.style.border = '1px solid #000000';
                                 ftd.style.padding = '8px 5px';
                               }
                             });

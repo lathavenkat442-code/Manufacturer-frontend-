@@ -649,11 +649,25 @@ const App: React.FC = () => {
         if (user?.uid && isOnline && isSupabaseConfigured) {
           syncToSupabase(user.uid);
         }
-      }, 5000); // Sync 5 seconds after last change
+      }, 500); // Fast 500ms sync trigger instead of 5s delay
     };
     window.addEventListener('local-storage-update', handleUpdate);
+    
+    const handleFlushSync = () => {
+      if (user?.uid && navigator.onLine && isSupabaseConfigured) {
+        syncToSupabase(user.uid);
+      }
+    };
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        handleFlushSync();
+      }
+    });
+    window.addEventListener('beforeunload', handleFlushSync);
+
     return () => {
       window.removeEventListener('local-storage-update', handleUpdate);
+      window.removeEventListener('beforeunload', handleFlushSync);
       clearTimeout(timeout);
     };
   }, [user?.uid, isOnline]);
@@ -825,6 +839,7 @@ const App: React.FC = () => {
       await processSyncQueue();
 
       try {
+        await syncToSupabase(user.uid);
         await fetchFromSupabase(user.uid);
         // Reload from local storage after fetching from Supabase
         loadLocal();
