@@ -66,6 +66,7 @@ const Weavers: React.FC<WeaversProps> = ({
   const [viewType, setViewType] = useState<'looms' | 'balance' | 'overview'>('overview');
 
   const [isAdding, setIsAdding] = useState(false);
+  const [editingWeaver, setEditingWeaver] = useState<Weaver | null>(null);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
 
@@ -176,16 +177,41 @@ const Weavers: React.FC<WeaversProps> = ({
       alert(language === 'ta' ? 'பெயரை உள்ளிடவும்' : 'Please enter a name');
       return;
     }
-    const newWeaver: Weaver = {
-        id: Date.now().toString(),
-        name: newName,
-        phone: newPhone,
-        createdAt: Date.now()
-    };
-    saveWeavers([...weavers, newWeaver]);
+    if (editingWeaver) {
+      const updated = weavers.map(w => w.id === editingWeaver.id ? { ...w, name: newName.trim(), phone: newPhone.trim() } : w);
+      saveWeavers(updated);
+      if (selectedWeaver?.id === editingWeaver.id) {
+        setSelectedWeaver({ ...selectedWeaver, name: newName.trim(), phone: newPhone.trim() });
+      }
+      setEditingWeaver(null);
+    } else {
+      const newWeaver: Weaver = {
+          id: Date.now().toString(),
+          name: newName.trim(),
+          phone: newPhone.trim(),
+          createdAt: Date.now()
+      };
+      saveWeavers([...weavers, newWeaver]);
+    }
     setNewName('');
     setNewPhone('');
     setIsAdding(false);
+  };
+
+  const handleEditWeaver = (weaver: Weaver) => {
+    setEditingWeaver(weaver);
+    setNewName(weaver.name);
+    setNewPhone(weaver.phone || '');
+    setIsAdding(true);
+  };
+
+  const handleDeleteWeaver = (weaverId: string) => {
+    if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த தறிகாரரை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this weaver?')) {
+      saveWeavers(weavers.filter(w => w.id !== weaverId));
+      if (selectedWeaver?.id === weaverId) {
+        setSelectedWeaver(null);
+      }
+    }
   };
 
   const handleShareStatement = (weaver: Weaver, txns: any[], totalReceived: number, totalConsumed: number, balance: number) => {
@@ -550,7 +576,23 @@ const Weavers: React.FC<WeaversProps> = ({
               <ArrowLeft size={20} className="text-zinc-600" />
             </button>
             <div>
-              <h2 className="text-2xl font-black text-zinc-900 tracking-tight">{selectedWeaver.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-black text-zinc-900 tracking-tight">{selectedWeaver.name}</h2>
+                <button 
+                  onClick={() => handleEditWeaver(selectedWeaver)}
+                  className="p-1 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition print:hidden"
+                  title={language === 'ta' ? 'தறிகாரரை திருத்து' : 'Edit Weaver'}
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button 
+                  onClick={() => handleDeleteWeaver(selectedWeaver.id)}
+                  className="p-1 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition print:hidden"
+                  title={language === 'ta' ? 'தறிகாரரை நீக்கு' : 'Delete Weaver'}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
               {selectedWeaver.phone && <p className="text-xs font-bold text-zinc-500 mt-0.5">{selectedWeaver.phone}</p>}
             </div>
           </div>

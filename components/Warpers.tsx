@@ -4,6 +4,7 @@ import { Plus, User as UserIcon, Trash2, ArrowLeft, Calendar, Palette, Weight, P
 import { YARN_COLORS, YARN_TYPES } from '../constants';
 import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
+import { WarperStatementView } from './WarperStatementView';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2pdf from 'html2pdf.js';
@@ -176,7 +177,9 @@ const WarpOrderItem: React.FC<{
     isExpanded: boolean;
     onToggleExpand: () => void;
     onRepeat?: () => void;
-}> = ({ order, language, onAssign, onShare, onToggleStatus, isExpanded, onToggleExpand, onRepeat }) => {
+    onEdit?: () => void;
+    onDelete?: () => void;
+}> = ({ order, language, onAssign, onShare, onToggleStatus, isExpanded, onToggleExpand, onRepeat, onEdit, onDelete }) => {
     return (
         <div 
             onClick={onToggleExpand}
@@ -194,6 +197,24 @@ const WarpOrderItem: React.FC<{
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {onEdit && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                                className="p-1.5 bg-zinc-100 text-zinc-700 rounded-full hover:bg-zinc-200 transition"
+                                title={language === 'ta' ? 'திருத்து' : 'Edit'}
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                        )}
+                        {onDelete && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                                className="p-1.5 bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100 transition"
+                                title={language === 'ta' ? 'நீக்கு' : 'Delete'}
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
                         {order.status === 'COMPLETED' && onRepeat && (
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onRepeat(); }}
@@ -377,6 +398,7 @@ const Warpers: React.FC<WarpersProps> = ({
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
   const [returnMeters, setReturnMeters] = useState('');
   const [returnWeaverId, setReturnWeaverId] = useState('');
+  const [returnWeaverName, setReturnWeaverName] = useState('');
   const [returnSections, setReturnSections] = useState<WarpSection[]>([{ name: '', ends: 0, color: '', weightKg: 0 }]);
 
   const [isAddingDispatch, setIsAddingDispatch] = useState(false);
@@ -852,6 +874,9 @@ const Warpers: React.FC<WarpersProps> = ({
     }
 
     const weaver = weavers.find(w => w.id === returnWeaverId);
+    const existingReturn = editingReturnId ? returns.find(r => r.id === editingReturnId) : null;
+    const finalWeaverName = returnWeaverName.trim() || weaver?.name || existingReturn?.weaverName;
+    const finalWeaverId = returnWeaverId || weaver?.id || existingReturn?.weaverId;
     
     const newReturn: WarperReturn = {
       id: editingReturnId || Date.now().toString(),
@@ -860,12 +885,14 @@ const Warpers: React.FC<WarpersProps> = ({
       color: uniqueColors,
       weightKg: totalWeight,
       yarnType: uniqueDeniers,
-      weaverId: returnWeaverId,
-      weaverName: weaver?.name,
+      weaverId: finalWeaverId,
+      weaverName: finalWeaverName,
+      orderId: existingReturn?.orderId,
+      orderNumber: existingReturn?.orderNumber,
       ends: totalEnds || undefined,
       meters: parseFloat(returnMeters) || undefined,
       sections: finalSections,
-      createdAt: editingReturnId ? (returns.find(r => r.id === editingReturnId)?.createdAt || Date.now()) : Date.now()
+      createdAt: existingReturn?.createdAt || Date.now()
     };
     
     let updatedReturns;
@@ -879,6 +906,7 @@ const Warpers: React.FC<WarpersProps> = ({
     setReturnSections([{ name: '', ends: 0, color: '', weightKg: 0 }]);
     setReturnMeters('');
     setReturnWeaverId('');
+    setReturnWeaverName('');
     setIsAddingReturn(false);
     setEditingReturnId(null);
     alert(language === 'ta' ? 'வார்ப்பு வரவு வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Warp return saved successfully!');
@@ -999,6 +1027,7 @@ const Warpers: React.FC<WarpersProps> = ({
     setEditingReturnId(ret.id);
     setReturnDate(ret.date);
     setReturnWeaverId(ret.weaverId || '');
+    setReturnWeaverName(ret.weaverName || '');
     setReturnMeters(ret.meters?.toString() || '');
     setReturnSections(ret.sections || [{ name: ret.yarnType || '', ends: ret.ends || 0, color: ret.color, weightKg: ret.weightKg }]);
     setIsAddingReturn(true);
@@ -2031,161 +2060,15 @@ const Warpers: React.FC<WarpersProps> = ({
     const warper = warpers.find(w => w.id === viewStatement);
     if (!warper) return null;
 
-    let statementDispatches = dispatches.filter(d => d.recipientType === 'warper' && d.recipientId === warper.id);
-    let statementReturns = returns.filter(r => r.warperId === warper.id);
-    
-    if (startDate) {
-      statementDispatches = statementDispatches.filter(d => d.date >= startDate);
-      statementReturns = statementReturns.filter(r => r.date >= startDate);
-    }
-    if (endDate) {
-      statementDispatches = statementDispatches.filter(d => d.date <= endDate);
-      statementReturns = statementReturns.filter(r => r.date <= endDate);
-    }
-
-    const groupedStatementDispatches = Object.values(statementDispatches.reduce((acc: any, d: any) => {
-      const key = d.createdAt || d.id;
-      if (!acc[key]) {
-        acc[key] = { ...d, isDispatch: true, timestamp: new Date(d.date).getTime(), items: [] };
-      }
-      acc[key].items.push({ yarnType: d.yarnType, color: d.color, weightKg: d.weightKg });
-      acc[key].weightKg = acc[key].items.reduce((sum: number, item: any) => sum + item.weightKg, 0);
-      return acc;
-    }, {} as Record<string, any>));
-
-    const allTxns = [
-      ...groupedStatementDispatches,
-      ...statementReturns.map(r => ({ ...r, isDispatch: false, timestamp: new Date(r.date).getTime() }))
-    ].sort((a: any, b: any) => a.timestamp - b.timestamp);
-
-    const totalReceived = statementDispatches.reduce((sum, d) => sum + d.weightKg, 0);
-    const totalReturned = statementReturns.reduce((sum, r) => sum + r.weightKg, 0);
-    const balance = totalReceived - totalReturned;
-
     return (
-      <div className={`bg-white min-h-screen p-4 md:p-8`}>
-        <div className="flex justify-between items-center mb-6 print:hidden">
-          <button onClick={() => setViewStatement(null)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
-            <ArrowLeft size={20} className="text-gray-700" />
-          </button>
-          <div className="flex gap-3 items-center">
-            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
-              <span className="text-xs font-bold text-gray-500">{language === 'ta' ? 'முதல்:' : 'From:'}</span>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-sm font-bold outline-none" />
-              <span className="text-xs font-bold text-gray-500 ml-2">{language === 'ta' ? 'வரை:' : 'To:'}</span>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-sm font-bold outline-none" />
-              {(startDate || endDate) && (
-                <button onClick={() => {setStartDate(''); setEndDate('');}} className="ml-2 text-red-500 hover:text-red-700 text-xs font-bold">
-                  {language === 'ta' ? 'அழி' : 'Clear'}
-                </button>
-              )}
-            </div>
-            <button onClick={downloadPDF} className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-xl font-bold hover:bg-zinc-800 transition">
-              <Printer size={18} /> {language === 'ta' ? 'டவுன்லோட் (PDF)' : 'Download PDF'}
-            </button>
-            <button 
-              onClick={() => handleShareStatement(warper, allTxns, balance)}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 transition"
-            >
-              <Share2 size={18} /> {language === 'ta' ? 'பகிர்' : 'Share'}
-            </button>
-          </div>
-        </div>
-
-        <div className="max-w-4xl mx-auto border border-zinc-100 rounded-[2.5rem] p-8 shadow-sm bg-white print:border-none print:p-0">
-          <div ref={statementRef} id="pdf-warper-statement">
-            <div className="text-center mb-10 border-b-2 border-zinc-900 pb-8">
-              <h1 className="text-3xl font-black text-zinc-900 mb-2 uppercase tracking-tight">{language === 'ta' ? 'வார்ப்புகாரர் கணக்கு அறிக்கை' : 'Warper Account Statement'}</h1>
-              <div className="flex flex-col items-center gap-1">
-                <h2 className="text-2xl font-black text-zinc-800">{warper.name}</h2>
-                {warper.phone && <p className="text-zinc-500 font-bold flex items-center gap-1"><span className="opacity-50">#</span> {warper.phone}</p>}
-              </div>
-              {(startDate || endDate) && (
-                <div className="bg-zinc-50 px-4 py-2 rounded-xl border border-zinc-100 inline-block mt-4">
-                  <p className="text-xs font-black text-zinc-400 mb-0.5 uppercase tracking-widest">{language === 'ta' ? 'காலம்' : 'Period'}</p>
-                  <p className="text-sm font-black text-zinc-800">
-                    {startDate ? new Date(startDate).toLocaleDateString() : 'Start'} - {endDate ? new Date(endDate).toLocaleDateString() : 'End'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="overflow-x-auto mb-10">
-              <table className="w-full text-left border-collapse border border-zinc-200">
-                <thead>
-                  <tr className="bg-zinc-900 text-white">
-                    <th className="py-4 px-4 font-black text-[13px] border border-zinc-900 uppercase tracking-wider">{language === 'ta' ? 'தேதி' : 'Date'}</th>
-                    <th className="py-4 px-4 font-black text-[13px] border border-zinc-900 uppercase tracking-wider">{language === 'ta' ? 'விவரம்' : 'Details'}</th>
-                    <th className="py-4 px-4 font-black text-[13px] text-right border border-zinc-900 uppercase tracking-wider">{language === 'ta' ? 'வரவு (kg)' : 'Received'}</th>
-                    <th className="py-4 px-4 font-black text-[13px] text-right border border-zinc-900 uppercase tracking-wider text-emerald-400 font-bold">{language === 'ta' ? 'வந்தது (kg)' : 'Returned'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {allTxns.map((txn: any, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/30'}>
-                      <td className="py-4 px-4 text-zinc-800 font-black text-[13px] border border-zinc-100">{new Date(txn.date).toLocaleDateString()}</td>
-                      <td className="py-4 px-4 border border-zinc-100">
-                        <div className="space-y-1">
-                          {txn.isDispatch ? (
-                            <div className="flex flex-col gap-1">
-                              {txn.items && txn.items.length > 1 ? (
-                                <>
-                                  <span className="flex items-center gap-1 font-black text-[14px] text-blue-700 tracking-tight"><ArrowDownLeft size={16} /> {language === 'ta' ? 'பல நூல்கள்' : 'Multiple Yarns'}</span>
-                                  <div className="text-[12px] font-bold text-zinc-500 ml-6">
-                                    {txn.items.map((item: any, i: number) => (
-                                      <div key={i}>{item.yarnType} {item.color} ({item.weightKg} kg)</div>
-                                    ))}
-                                  </div>
-                                </>
-                              ) : (
-                                <span className="flex items-center gap-1 font-black text-[14px] text-blue-700 tracking-tight"><ArrowDownLeft size={16} /> {txn.yarnType} {txn.color}</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="flex items-center gap-1 font-black text-[14px] text-emerald-700 tracking-tight"><ArrowUpRight size={16} /> {txn.yarnType} {txn.color} {txn.ends ? `(${txn.ends} Ends)` : ''}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-right font-black text-[15px] border border-zinc-100 text-blue-600 italic">{txn.isDispatch ? txn.weightKg.toFixed(2) : '-'}</td>
-                      <td className="py-4 px-4 text-right font-black text-[15px] border border-zinc-100 text-emerald-600 font-bold">{!txn.isDispatch ? txn.weightKg.toFixed(2) : '-'}</td>
-                    </tr>
-                  ))}
-                  {allTxns.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-12 text-center text-zinc-400 font-black tracking-tight text-lg italic uppercase">
-                        {language === 'ta' ? 'பதிவுகள் இல்லை' : 'No records found'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end pr-4">
-              <div className="w-80 space-y-4 bg-zinc-900 p-8 rounded-[2rem] shadow-xl text-white">
-                <div className="flex justify-between items-center text-blue-300 font-black text-sm uppercase tracking-widest">
-                  <span>{language === 'ta' ? 'வரவு' : 'Received'}</span>
-                  <span className="text-xl">{totalReceived.toFixed(2)} <span className="text-xs opacity-60">kg</span></span>
-                </div>
-                <div className="flex justify-between items-center text-emerald-300 font-black text-sm uppercase tracking-widest">
-                  <span>{language === 'ta' ? 'வந்தது' : 'Returned'}</span>
-                  <span className="text-xl">{totalReturned.toFixed(2)} <span className="text-xs opacity-60">kg</span></span>
-                </div>
-                <div className="h-px bg-white/10 my-2" />
-                <div className="flex justify-between items-center text-2xl font-black italic tracking-tighter">
-                  <span className="uppercase">{language === 'ta' ? 'பாக்கி' : 'Balance'}</span>
-                  <span className={balance > 0 ? 'text-rose-400' : 'text-emerald-400'}>{balance.toFixed(2)} <span className="text-sm opacity-60 not-italic">kg</span></span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-12 pt-8 border-t border-zinc-100 text-center">
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">{language === 'ta' ? 'ஆப் மூலம் உருவாக்கப்பட்டது' : 'Generated via Weaver App'}</p>
-            </div>
-          </div>
-        </div>
-        {transactionDetailsModal}
-      </div>
+      <WarperStatementView 
+        warper={warper}
+        dispatches={dispatches}
+        returns={returns}
+        warpOrders={warpOrders}
+        language={language}
+        onClose={() => setViewStatement(null)}
+      />
     );
   }
 
@@ -2237,7 +2120,26 @@ const Warpers: React.FC<WarpersProps> = ({
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
             <div>
-              <h2 className="text-xl font-black text-gray-800">{selectedWarper.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-black text-gray-800">{selectedWarper.name}</h2>
+                <button 
+                  onClick={() => handleEditWarper(selectedWarper)}
+                  className="p-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition print:hidden"
+                  title={language === 'ta' ? 'வாரப்பரை திருத்து' : 'Edit Warper'}
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button 
+                  onClick={() => {
+                    handleDelete(selectedWarper.id);
+                    setSelectedWarper(null);
+                  }}
+                  className="p-1 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition print:hidden"
+                  title={language === 'ta' ? 'வாரப்பரை நீக்கு' : 'Delete Warper'}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
               {selectedWarper.phone && <p className="text-xs font-bold text-gray-500">{selectedWarper.phone}</p>}
             </div>
           </div>
@@ -2365,7 +2267,15 @@ const Warpers: React.FC<WarpersProps> = ({
                   <ArrowDownLeft size={18} /> {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
                 </button>
                 <button 
-                  onClick={() => setIsAddingReturn(true)}
+                  onClick={() => {
+                    setEditingReturnId(null);
+                    setReturnDate(new Date().toISOString().split('T')[0]);
+                    setReturnWeaverId('');
+                    setReturnWeaverName('');
+                    setReturnMeters('');
+                    setReturnSections([{ name: '', ends: 0, color: '', weightKg: 0 }]);
+                    setIsAddingReturn(true);
+                  }}
                   className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
                 >
                   <ArrowUpRight size={18} /> {language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'}
@@ -3179,6 +3089,8 @@ const Warpers: React.FC<WarpersProps> = ({
                   onToggleStatus={() => handleToggleOrderStatus(order.id)}
                   onRepeat={() => handleRepeatOrder(order)}
                   onShare={() => handleShareOrder(order)}
+                  onEdit={() => handleEditOrder(order)}
+                  onDelete={() => handleDeleteOrder(order.id)}
                   isExpanded={expandedOrderId === order.id}
                   onToggleExpand={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
                 />
@@ -3222,6 +3134,8 @@ const Warpers: React.FC<WarpersProps> = ({
                   onToggleStatus={() => handleToggleOrderStatus(order.id)}
                   onRepeat={() => handleRepeatOrder(order)}
                   onShare={() => handleShareOrder(order)}
+                  onEdit={() => handleEditOrder(order)}
+                  onDelete={() => handleDeleteOrder(order.id)}
                   isExpanded={expandedOrderId === order.id}
                   onToggleExpand={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
                 />
@@ -3265,6 +3179,8 @@ const Warpers: React.FC<WarpersProps> = ({
                   onToggleStatus={() => handleToggleOrderStatus(order.id)}
                   onRepeat={() => handleRepeatOrder(order)}
                   onShare={() => handleShareOrder(order)}
+                  onEdit={() => handleEditOrder(order)}
+                  onDelete={() => handleDeleteOrder(order.id)}
                   isExpanded={expandedOrderId === order.id}
                   onToggleExpand={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
                 />
@@ -3517,18 +3433,34 @@ const Warpers: React.FC<WarpersProps> = ({
                                     <p className={`font-bold ${balance > 0 ? 'text-red-600' : 'text-gray-700'}`}>₹{balance}</p>
                                   </div>
                                 </div>
-                                <button 
-                                  onClick={() => setEditingWages({...editingWages, [order.id]: { wage: order.wage?.toString() || '', wagePaid: order.wagePaid?.toString() || '' }})}
-                                  className="w-full py-2 border border-zinc-200 text-zinc-600 font-bold rounded-lg text-sm hover:bg-zinc-50 transition"
-                                >
-                                  {language === 'ta' ? 'கூலியை திருத்து' : 'Edit Wage'}
-                                </button>
-                                <button 
-                                  onClick={() => handleShareOrder(order)}
-                                  className="w-full mt-2 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-lg text-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
-                                >
-                                  <Share2 size={16} /> {language === 'ta' ? 'பகிர்' : 'Share'}
-                                </button>
+                                <div className="grid grid-cols-2 gap-2 my-2">
+                                  <button 
+                                    onClick={() => setEditingWages({...editingWages, [order.id]: { wage: order.wage?.toString() || '', wagePaid: order.wagePaid?.toString() || '' }})}
+                                    className="py-2 border border-zinc-200 text-zinc-600 font-bold rounded-lg text-sm hover:bg-zinc-50 transition"
+                                  >
+                                    {language === 'ta' ? 'கூலியை திருத்து' : 'Edit Wage'}
+                                  </button>
+                                  <button 
+                                    onClick={() => handleEditOrder(order)}
+                                    className="py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-sm hover:bg-indigo-100 transition flex items-center justify-center gap-1"
+                                  >
+                                    <Edit2 size={14} /> {language === 'ta' ? 'ஆர்டர் திருத்து' : 'Edit Order'}
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                  <button 
+                                    onClick={() => handleShareOrder(order)}
+                                    className="py-2 bg-emerald-50 text-emerald-600 font-bold rounded-lg text-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                  >
+                                    <Share2 size={16} /> {language === 'ta' ? 'பகிர்' : 'Share'}
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    className="py-2 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100 transition flex items-center justify-center gap-2"
+                                  >
+                                    <Trash2 size={16} /> {language === 'ta' ? 'நீக்கு' : 'Delete'}
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -4240,16 +4172,41 @@ const Warpers: React.FC<WarpersProps> = ({
                 onChange={e => setReturnDate(e.target.value)}
                 className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-emerald-400 font-bold"
               />
-              <select 
-                value={returnWeaverId}
-                onChange={e => setReturnWeaverId(e.target.value)}
-                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-emerald-400 font-bold"
-              >
-                <option value="">{language === 'ta' ? '-- தறிகாரர் --' : '-- Weaver --'}</option>
-                {weavers.map(w => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-600 block">
+                  {language === 'ta' ? 'தறிகாரர்' : 'Weaver'}
+                </label>
+                <select 
+                  value={returnWeaverId}
+                  onChange={e => {
+                    const selId = e.target.value;
+                    setReturnWeaverId(selId);
+                    const w = weavers.find(item => item.id === selId);
+                    if (w) {
+                      setReturnWeaverName(w.name);
+                    }
+                  }}
+                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-emerald-400 font-bold"
+                >
+                  <option value="">{language === 'ta' ? '-- தறிகாரரை தேர்ந்தெடுக்கவும் --' : '-- Select Weaver --'}</option>
+                  {weavers.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+
+                <input 
+                  type="text" 
+                  placeholder={language === 'ta' ? 'அல்லது தறிகாரர் பெயர் உள்ளிடவும் / எடிட் செய்யவும்' : 'Or enter / edit Weaver Name'}
+                  value={returnWeaverName}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setReturnWeaverName(val);
+                    const matched = weavers.find(w => w.name.toLowerCase() === val.trim().toLowerCase());
+                    if (matched) setReturnWeaverId(matched.id);
+                  }}
+                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-emerald-400 font-bold"
+                />
+              </div>
 
               <input 
                 type="number" 
@@ -4357,7 +4314,7 @@ const Warpers: React.FC<WarpersProps> = ({
               </p>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setIsAddingReturn(false); setEditingReturnId(null); }} className="flex-1 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold text-sm">
+              <button onClick={() => { setIsAddingReturn(false); setEditingReturnId(null); setReturnWeaverName(''); }} className="flex-1 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold text-sm">
                 {language === 'ta' ? 'ரத்து' : 'Cancel'}
               </button>
               <button onClick={handleAddReturn} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-200">

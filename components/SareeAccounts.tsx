@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Loom, LoomTransaction, WarpType, WarpSection, Warper, WarpOrder, DenierFormula } from '../types';
-import { Plus, ArrowLeft, Calendar, ChevronDown, ChevronUp, X, Send, CheckCircle, Share2, ArrowRightCircle, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Calendar, ChevronDown, ChevronUp, X, Send, CheckCircle, Share2, ArrowRightCircle, Trash2, Edit2 } from 'lucide-react';
 import { YARN_COLORS, YARN_TYPES } from '../constants';
 import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
@@ -12,7 +12,9 @@ const SareeTransactionRow: React.FC<{
   loom: Loom;
   language: 'ta' | 'en';
   columnWidths: Record<string, number>;
-}> = ({ txn, loom, language, columnWidths }) => {
+  onEdit?: () => void;
+  onDelete?: () => void;
+}> = ({ txn, loom, language, columnWidths, onEdit, onDelete }) => {
   const getW = (id: string, def = 100) => ({ width: columnWidths[id] || def, minWidth: columnWidths[id] || def });
   
   if (txn.type === 'YARN_GIVEN') {
@@ -34,7 +36,20 @@ const SareeTransactionRow: React.FC<{
           </div>
         </td>
         <td className="p-3 font-bold text-zinc-900 whitespace-nowrap" style={getW('wagePaid', 100)}>+{txn.yarnGivenWeight}kg</td>
-        <td className="p-3" style={getW('balance', 100)}></td>
+        <td className="p-3 text-right" style={getW('balance', 100)}>
+          <div className="flex items-center justify-end gap-1">
+            {onEdit && (
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50 rounded" title={language === 'ta' ? 'திருத்து' : 'Edit'}>
+                <Edit2 size={14} />
+              </button>
+            )}
+            {onDelete && (
+              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 rounded" title={language === 'ta' ? 'நீக்கு' : 'Delete'}>
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        </td>
       </tr>
     );
   }
@@ -52,7 +67,20 @@ const SareeTransactionRow: React.FC<{
       <td className="p-3 font-bold text-zinc-900 whitespace-nowrap overflow-hidden text-ellipsis" style={getW('totalWage', 100)}>₹{totalWage}</td>
       <td className="p-3 font-bold text-emerald-600 whitespace-nowrap overflow-hidden text-ellipsis" style={getW('wagePaid', 100)}>₹{paid}</td>
       <td className={`p-3 font-bold whitespace-nowrap overflow-hidden text-ellipsis ${balance > 0 ? 'text-rose-500' : 'text-zinc-900'}`} style={getW('balance', 100)}>₹{balance}</td>
-      <td className="p-3 text-right"></td>
+      <td className="p-3 text-right">
+        <div className="flex items-center justify-end gap-1">
+          {onEdit && (
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50 rounded" title={language === 'ta' ? 'திருத்து' : 'Edit'}>
+              <Edit2 size={14} />
+            </button>
+          )}
+          {onDelete && (
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 rounded" title={language === 'ta' ? 'நீக்கு' : 'Delete'}>
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </td>
     </tr>
   );
 };
@@ -325,6 +353,55 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
   const saveWarpOrders = (newOrders: WarpOrder[]) => {
     setWarpOrders(newOrders);
     localStorage.setItem(`viyabaari_warp_orders_${user.uid || 'guest'}`, JSON.stringify(newOrders));
+  };
+
+  const handleEditLoom = (loom: Loom) => {
+    const newLoomNum = prompt(language === 'ta' ? 'புதிய தறி எண்:' : 'New Loom Number:', loom.loomNumber);
+    if (newLoomNum === null) return;
+    const newDesign = prompt(language === 'ta' ? 'புதிய டிசைன் பெயர்:' : 'New Design Name:', loom.designName || '');
+    const newSareeWage = prompt(language === 'ta' ? 'சேலை கூலி (₹):' : 'Saree Wage (₹):', (loom.sareeWage || 0).toString());
+    
+    saveLooms(looms.map(l => l.id === loom.id ? { 
+      ...l, 
+      loomNumber: newLoomNum.trim() || l.loomNumber, 
+      designName: newDesign !== null ? newDesign.trim() : l.designName,
+      sareeWage: newSareeWage ? parseFloat(newSareeWage) || 0 : l.sareeWage
+    } : l));
+  };
+
+  const handleDeleteLoom = (loomId: string) => {
+    if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த தறியை நீக்க வேண்டுமா? இதனுடன் தொடர்புடைய அனைத்து பதிவுகளும் நீக்கப்படும்!' : 'Are you sure you want to delete this loom? All associated transactions will be deleted!')) {
+      saveLooms(looms.filter(l => l.id !== loomId));
+      saveTransactions(transactions.filter(t => t.loomId !== loomId));
+    }
+  };
+
+  const handleDeleteTransaction = (txnId: string) => {
+    if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த பதிவை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this transaction?')) {
+      saveTransactions(transactions.filter(t => t.id !== txnId));
+    }
+  };
+
+  const handleEditTransaction = (txn: LoomTransaction) => {
+    if (txn.type === 'YARN_GIVEN') {
+      const newWeight = prompt(language === 'ta' ? 'புதிய எடை (kg):' : 'New Weight (kg):', (txn.yarnGivenWeight || 0).toString());
+      if (newWeight === null) return;
+      saveTransactions(transactions.map(t => t.id === txn.id ? { ...t, yarnGivenWeight: parseFloat(newWeight) || 0 } : t));
+    } else {
+      const newSarees = prompt(language === 'ta' ? 'கொடுத்த சேலைகள்:' : 'Sarees Delivered:', (txn.sareesDelivered || 0).toString());
+      if (newSarees === null) return;
+      const newYarn = prompt(language === 'ta' ? 'செலவான நூல் (kg):' : 'Yarn Consumed (kg):', (txn.yarnConsumed || 0).toString());
+      const newWagePaid = prompt(language === 'ta' ? 'கொடுத்த கூலி (₹):' : 'Wage Paid (₹):', (txn.wagePaid || 0).toString());
+      const newZari = prompt(language === 'ta' ? 'ஜரிகை கட்டா:' : 'Zari Katta Given:', (txn.zariKattaGiven || '').toString());
+
+      saveTransactions(transactions.map(t => t.id === txn.id ? {
+        ...t,
+        sareesDelivered: parseInt(newSarees) || 0,
+        yarnConsumed: parseFloat(newYarn || '0') || 0,
+        wagePaid: parseFloat(newWagePaid || '0') || 0,
+        zariKattaGiven: newZari !== null ? parseInt(newZari) || 0 : t.zariKattaGiven
+      } : t));
+    }
   };
 
   const handleCreateWarpOrder = (loom: Loom) => {
@@ -1075,6 +1152,20 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleEditLoom(loom); }}
+                    className="p-1.5 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                    title={language === 'ta' ? 'தறி திருத்து' : 'Edit Loom'}
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteLoom(loom.id); }}
+                    className="p-1.5 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                    title={language === 'ta' ? 'தறி நீக்கு' : 'Delete Loom'}
+                  >
+                    <Trash2 size={16} />
+                  </button>
                   {isExpanded ? <ChevronUp size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
                 </div>
               </div>
@@ -1875,6 +1966,8 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
                                 loom={loom}
                                 language={language}
                                 columnWidths={columnWidths}
+                                onEdit={() => handleEditTransaction(txn)}
+                                onDelete={() => handleDeleteTransaction(txn.id)}
                             />
                           ))}
                         </tbody>
@@ -1973,6 +2066,18 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
                             title={language === 'ta' ? 'பகிர்' : 'Share'}
                           >
                             <Share2 size={16} />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த கணக்கை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this completed record?')) {
+                                saveWarpOrders(warpOrders.filter(o => o.id !== order.id));
+                              }
+                            }}
+                            className="p-1 text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            title={language === 'ta' ? 'நீக்கு' : 'Delete'}
+                          >
+                            <Trash2 size={16} />
                           </button>
                           {isExpanded ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
                         </div>

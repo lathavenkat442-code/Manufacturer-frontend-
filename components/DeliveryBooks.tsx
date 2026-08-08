@@ -58,6 +58,12 @@ const DeliveryBooks: React.FC<DeliveryBooksProps> = ({ user, language, onBack, o
     localStorage.setItem(`viyabaari_delivery_books_${user.uid || 'guest'}`, JSON.stringify(newBooks));
   };
 
+  const handleDeleteBook = (bookId: string) => {
+    if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த புத்தகத்தை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this book?')) {
+      saveBooks(customBooks.filter(b => b.id !== bookId));
+    }
+  };
+
   const handleAdd = () => {
     if (!newBookName.trim()) return;
     const newBook: DeliveryBook = {
@@ -181,8 +187,8 @@ const DeliveryBooks: React.FC<DeliveryBooksProps> = ({ user, language, onBack, o
         <div className="space-y-3">
           <h3 className="font-bold text-gray-500 text-sm mb-3 tamil-font uppercase tracking-wider">{language === 'ta' ? 'மற்ற புத்தகங்கள்' : 'Other Books'}</h3>
           {customBooks.map(book => (
-            <div key={book.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition cursor-pointer">
-              <div className="flex items-center gap-4">
+            <div key={book.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition">
+              <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveSlipConfig({ type: 'weaver' })}>
                 <div className="w-12 h-12 bg-gradient-to-br from-rose-100 to-rose-200 text-rose-700 rounded-full flex items-center justify-center font-black text-xl shadow-inner">
                   <BookOpen size={20} />
                 </div>
@@ -190,6 +196,13 @@ const DeliveryBooks: React.FC<DeliveryBooksProps> = ({ user, language, onBack, o
                   <h4 className="font-black text-gray-800 text-lg">{book.name}</h4>
                 </div>
               </div>
+              <button 
+                onClick={() => handleDeleteBook(book.id)}
+                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                title={language === 'ta' ? 'நீக்கு' : 'Delete'}
+              >
+                <Trash2 size={18} />
+              </button>
             </div>
           ))}
         </div>
