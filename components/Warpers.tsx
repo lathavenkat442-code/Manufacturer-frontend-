@@ -2286,13 +2286,324 @@ const Warpers: React.FC<WarpersProps> = ({
         ) : (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
             {viewType === 'ledger' && (
-              <WarperStatementView 
-                warper={selectedWarper}
-                dispatches={dispatches}
-                returns={returns}
-                warpOrders={warpOrders}
-                language={language}
-              />
+              <div className="space-y-4">
+                {/* Header Actions & Filters */}
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="text-indigo-600" size={20} />
+                      <h3 className="font-black text-gray-800 text-base tamil-font">
+                        {language === 'ta' ? 'கணக்கு நோட்டு (Ledger)' : 'Ledger Account'}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button 
+                        onClick={() => setViewStatement(selectedWarper.id)}
+                        className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 transition"
+                      >
+                        <FileText size={14} />
+                        {language === 'ta' ? 'PDF அறிக்கை' : 'PDF Statement'}
+                      </button>
+                      <button 
+                        onClick={() => setIsAddingDispatch(true)}
+                        className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-indigo-700 shadow-sm transition"
+                      >
+                        <ArrowDownLeft size={14} />
+                        {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setEditingReturnId(null);
+                          setReturnDate(new Date().toISOString().split('T')[0]);
+                          setReturnWeaverId('');
+                          setReturnWeaverName('');
+                          setReturnMeters('');
+                          setReturnSections([{ name: '', ends: 0, color: '', weightKg: 0 }]);
+                          setIsAddingReturn(true);
+                        }}
+                        className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-700 shadow-sm transition"
+                      >
+                        <ArrowUpRight size={14} />
+                        {language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Date Range & Row Limit Filters */}
+                  <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
+                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
+                      <span className="text-xs font-bold text-gray-500">{language === 'ta' ? 'முதல்:' : 'From:'}</span>
+                      <input 
+                        type="date" 
+                        value={startDate} 
+                        onChange={e => setStartDate(e.target.value)} 
+                        className="bg-transparent text-xs font-bold outline-none" 
+                      />
+                      <span className="text-xs font-bold text-gray-500 ml-1">{language === 'ta' ? 'வரை:' : 'To:'}</span>
+                      <input 
+                        type="date" 
+                        value={endDate} 
+                        onChange={e => setEndDate(e.target.value)} 
+                        className="bg-transparent text-xs font-bold outline-none" 
+                      />
+                      {(startDate || endDate) && (
+                        <button 
+                          onClick={() => { setStartDate(''); setEndDate(''); }} 
+                          className="ml-1 text-rose-500 hover:text-rose-700 text-xs font-bold"
+                        >
+                          {language === 'ta' ? 'அழி' : 'Clear'}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 ml-auto">
+                      <span className="text-xs font-bold text-gray-500">{language === 'ta' ? 'வரிசைகள்:' : 'Rows:'}</span>
+                      <select 
+                        value={statementRowLimit} 
+                        onChange={e => setStatementRowLimit(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                        className="bg-transparent text-xs font-bold outline-none"
+                      >
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value="ALL">{language === 'ta' ? 'அனைத்தும்' : 'ALL'}</option>
+                      </select>
+                    </div>
+
+                    <button 
+                      onClick={() => setIsEditingColumns(!isEditingColumns)} 
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${isEditingColumns ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      <Settings size={14} />
+                      {isEditingColumns ? (language === 'ta' ? 'அளவை சேமி' : 'Save Column Sizes') : (language === 'ta' ? 'அளவை மாற்று' : 'Resize Columns')}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ledger Interactive Matrix Table */}
+                {(() => {
+                  const warperDispatches = dispatches.filter(d => d.recipientType === 'warper' && d.recipientId === selectedWarper.id);
+                  const warperReturns = returns.filter(r => r.warperId === selectedWarper.id);
+
+                  // Extract all unique Deniers / Colors
+                  const denierColorSet = new Set<string>();
+
+                  warperDispatches.forEach(d => {
+                    if (d.items && Array.isArray(d.items)) {
+                      d.items.forEach((item: any) => {
+                        const key = `${item.yarnType || ''} ${item.color || ''}`.trim() || item.color || 'Default';
+                        denierColorSet.add(key);
+                      });
+                    } else if (d.color) {
+                      const key = `${d.yarnType || ''} ${d.color}`.trim();
+                      denierColorSet.add(key);
+                    }
+                  });
+
+                  warperReturns.forEach(r => {
+                    if (r.sections && Array.isArray(r.sections)) {
+                      r.sections.forEach((sec: any) => {
+                        if (sec.color) {
+                          const denierName = sec.name ? sec.name.split(' - ')[0] : (r.yarnType || '');
+                          const key = `${denierName} ${sec.color}`.trim() || sec.color;
+                          denierColorSet.add(key);
+                        }
+                      });
+                    } else if (r.color) {
+                      const key = `${r.yarnType || ''} ${r.color}`.trim();
+                      denierColorSet.add(key);
+                    }
+                  });
+
+                  const allDenierColors = Array.from(denierColorSet).sort();
+
+                  // Map all transactions
+                  const allTxnsFormatted = [
+                    ...warperDispatches.map(d => {
+                      const weights: Record<string, number> = {};
+                      allDenierColors.forEach(dc => { weights[dc] = 0; });
+
+                      if (d.items && Array.isArray(d.items)) {
+                        d.items.forEach((item: any) => {
+                          const key = `${item.yarnType || ''} ${item.color || ''}`.trim() || item.color || 'Default';
+                          if (weights[key] !== undefined) weights[key] += item.weightKg || 0;
+                        });
+                      } else if (d.color) {
+                        const key = `${d.yarnType || ''} ${d.color}`.trim();
+                        if (weights[key] !== undefined) weights[key] += d.weightKg || 0;
+                      }
+
+                      return {
+                        ...d,
+                        isDispatch: true,
+                        timestamp: new Date(d.date).getTime(),
+                        colorWeights: weights
+                      };
+                    }),
+                    ...warperReturns.map(r => {
+                      const weights: Record<string, number> = {};
+                      allDenierColors.forEach(dc => { weights[dc] = 0; });
+
+                      let totalEnds = r.ends || 0;
+                      let totalMeters = r.length || 0;
+
+                      if (r.sections && Array.isArray(r.sections)) {
+                        totalEnds = r.sections.reduce((sum, sec) => sum + (sec.ends || 0), 0);
+                        r.sections.forEach((sec: any) => {
+                          if (sec.color) {
+                            const denierName = sec.name ? sec.name.split(' - ')[0] : (r.yarnType || '');
+                            const key = `${denierName} ${sec.color}`.trim() || sec.color;
+                            if (weights[key] !== undefined) weights[key] += sec.weightKg || 0;
+                          }
+                        });
+                      } else if (r.color) {
+                        const key = `${r.yarnType || ''} ${r.color}`.trim();
+                        if (weights[key] !== undefined) weights[key] += r.weightKg || 0;
+                      }
+
+                      return {
+                        ...r,
+                        isDispatch: false,
+                        ends: totalEnds,
+                        meters: totalMeters,
+                        timestamp: new Date(r.date).getTime(),
+                        colorWeights: weights
+                      };
+                    })
+                  ].sort((a, b) => a.timestamp - b.timestamp);
+
+                  // Filter by date
+                  let filteredTxns = allTxnsFormatted;
+                  if (startDate) {
+                    filteredTxns = filteredTxns.filter(t => t.date >= startDate);
+                  }
+                  if (endDate) {
+                    filteredTxns = filteredTxns.filter(t => t.date <= endDate);
+                  }
+
+                  const displayTxns = statementRowLimit === 'ALL' ? filteredTxns : filteredTxns.slice(0, statementRowLimit);
+
+                  if (allDenierColors.length === 0 && filteredTxns.length === 0) {
+                    return (
+                      <div className="bg-white p-12 rounded-3xl border border-dashed border-gray-200 text-center">
+                        <p className="text-gray-400 font-bold text-base tamil-font">
+                          {language === 'ta' ? 'கணக்கு பதிவுகள் எதுவும் இல்லை' : 'No ledger records found'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                      <div className="overflow-x-auto max-w-full">
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead>
+                            <tr className="bg-zinc-900 text-white font-black">
+                              <th style={{ width: columnWidths['date'] || 90, minWidth: columnWidths['date'] || 90 }} className="p-2.5 border border-zinc-800">{language === 'ta' ? 'தேதி' : 'Date'}</th>
+                              <th style={{ width: columnWidths['sno'] || 45, minWidth: columnWidths['sno'] || 45 }} className="p-2.5 border border-zinc-800 text-center">{language === 'ta' ? 'வ.எண்' : 'S.No'}</th>
+                              <th style={{ width: columnWidths['particulars'] || 180, minWidth: columnWidths['particulars'] || 180 }} className="p-2.5 border border-zinc-800">{language === 'ta' ? 'விவரம்' : 'Particulars'}</th>
+                              <th style={{ width: columnWidths['ends'] || 55, minWidth: columnWidths['ends'] || 55 }} className="p-2.5 border border-zinc-800 text-center">{language === 'ta' ? 'இழை' : 'Ends'}</th>
+                              <th style={{ width: columnWidths['meters'] || 55, minWidth: columnWidths['meters'] || 55 }} className="p-2.5 border border-zinc-800 text-center">{language === 'ta' ? 'மீட்டர்' : 'Meters'}</th>
+                              {allDenierColors.map(dc => {
+                                const width = columnWidths[dc] || (isEditingColumns ? baseColumnWidth : null);
+                                return (
+                                  <th key={dc} style={width ? { minWidth: `${width}px`, width: `${width}px` } : {}} className="p-2.5 border border-zinc-800 text-right whitespace-normal break-words leading-tight">
+                                    {dc}
+                                  </th>
+                                );
+                              })}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {displayTxns.length === 0 ? (
+                              <tr>
+                                <td colSpan={5 + allDenierColors.length} className="p-8 text-center text-gray-400 font-bold">
+                                  {language === 'ta' ? 'பதிவுகள் எதுவும் இல்லை' : 'No records found'}
+                                </td>
+                              </tr>
+                            ) : (
+                              displayTxns.map((txn: any, idx: number) => {
+                                let particularsText = '';
+                                if (txn.isDispatch) {
+                                  particularsText = language === 'ta' ? 'நூல் வரவு' : 'Yarn Given';
+                                  if (txn.supplierName) particularsText += ` - ${txn.supplierName}`;
+                                  if (txn.billNumber) particularsText += ` (Bill: ${txn.billNumber})`;
+                                } else {
+                                  const order = warpOrders.find(o => o.id === txn.orderId);
+                                  const weaverName = order?.weaverName || txn.weaverName;
+                                  const orderNumber = order?.orderNumber || txn.orderNumber;
+
+                                  const baseText = weaverName && weaverName !== 'Unknown'
+                                    ? `${weaverName} ${orderNumber ? `(${orderNumber})` : ''}`
+                                    : `${language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'} ${orderNumber ? `(${orderNumber})` : ''}`;
+
+                                  let details = '';
+                                  if (txn.sections && txn.sections.length > 0) {
+                                    details = txn.sections.map((s: any) => `${s.color || ''} (${s.ends || 0})`).filter((d: string) => d !== ' (0)').join(', ');
+                                  } else if (txn.color) {
+                                    details = `${txn.color} (${txn.ends || 0})`;
+                                  }
+
+                                  particularsText = details ? `${baseText} - ${details}` : baseText;
+                                }
+
+                                return (
+                                  <tr key={txn.id || idx} className="hover:bg-gray-50/80 transition">
+                                    <td className="p-2 border border-gray-200 text-gray-600 font-medium">
+                                      {new Date(txn.date).toLocaleDateString()}
+                                    </td>
+                                    <td className="p-2 border border-gray-200 text-center text-gray-500 font-bold">
+                                      {idx + 1}
+                                    </td>
+                                    <td 
+                                      className="p-2 border border-gray-200 font-black text-indigo-700 cursor-pointer hover:underline whitespace-normal break-words leading-tight"
+                                      onClick={() => setSelectedTxnDetails(txn)}
+                                    >
+                                      {particularsText}
+                                    </td>
+                                    <td className="p-2 border border-gray-200 text-center font-bold text-gray-600">
+                                      {!txn.isDispatch && (txn.ends !== undefined && txn.ends !== null) ? txn.ends : '-'}
+                                    </td>
+                                    <td className="p-2 border border-gray-200 text-center font-bold text-gray-600">
+                                      {!txn.isDispatch && (txn.meters !== undefined && txn.meters !== null) ? txn.meters : '-'}
+                                    </td>
+                                    {allDenierColors.map(dc => {
+                                      const val = txn.colorWeights[dc] || 0;
+                                      return (
+                                        <td key={dc} className={`p-2 border border-gray-200 text-right font-black ${val > 0 ? (txn.isDispatch ? 'text-indigo-700' : 'text-emerald-700') : 'text-gray-300'}`}>
+                                          {val > 0 ? (txn.isDispatch ? `+${val.toFixed(2)}` : `-${val.toFixed(2)}`) : '-'}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                          <tfoot className="bg-zinc-900 text-white font-black border-t-2 border-gray-200">
+                            <tr>
+                              <td colSpan={5} className="p-3 text-right uppercase tracking-wider text-[11px] bg-zinc-900 border-zinc-800">
+                                {language === 'ta' ? 'தற்போதைய இருப்பு (Total Balance):' : 'Total Balance:'}
+                              </td>
+                              {allDenierColors.map(dc => {
+                                const finalBal = filteredTxns.reduce((sum, t) => {
+                                  if (t.isDispatch) return sum + (t.colorWeights[dc] || 0);
+                                  return sum - (t.colorWeights[dc] || 0);
+                                }, 0);
+                                return (
+                                  <td key={dc} className={`p-3 border border-zinc-800 text-right font-black ${finalBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                    {finalBal.toFixed(2)}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             )}
 
 
