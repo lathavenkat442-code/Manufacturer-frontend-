@@ -101,7 +101,6 @@ export interface YarnDispatch {
   supplierId?: string;
   supplierName?: string;
   billNumber?: string;
-  items?: { yarnType: string; color: string; weightKg: number }[];
   createdAt: number;
 }
 
@@ -116,7 +115,6 @@ export interface WarperReturn {
   weaverName?: string;
   ends?: number;
   meters?: number;
-  length?: number;
   zariBobbins?: number; // New: Number of Zari Bobbins
   zariEndsPerBobbin?: number; // New: Ends per Zari Bobbin
   zariMeters?: number; // New: Meters per Zari Bobbin

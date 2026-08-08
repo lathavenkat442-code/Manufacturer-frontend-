@@ -2286,359 +2286,776 @@ const Warpers: React.FC<WarpersProps> = ({
         ) : (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
             {viewType === 'ledger' && (
-              <div className="space-y-4">
-                {/* Header Actions & Filters */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="text-indigo-600" size={20} />
-                      <h3 className="font-black text-gray-800 text-base tamil-font">
-                        {language === 'ta' ? 'கணக்கு நோட்டு (Ledger)' : 'Ledger Account'}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button 
-                        onClick={() => setViewStatement(selectedWarper.id)}
-                        className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 transition"
-                      >
-                        <FileText size={14} />
-                        {language === 'ta' ? 'PDF அறிக்கை' : 'PDF Statement'}
-                      </button>
-                      <button 
-                        onClick={() => setIsAddingDispatch(true)}
-                        className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-indigo-700 shadow-sm transition"
-                      >
-                        <ArrowDownLeft size={14} />
-                        {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setEditingReturnId(null);
-                          setReturnDate(new Date().toISOString().split('T')[0]);
-                          setReturnWeaverId('');
-                          setReturnWeaverName('');
-                          setReturnMeters('');
-                          setReturnSections([{ name: '', ends: 0, color: '', weightKg: 0 }]);
-                          setIsAddingReturn(true);
-                        }}
-                        className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-emerald-700 shadow-sm transition"
-                      >
-                        <ArrowUpRight size={14} />
-                        {language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'}
-                      </button>
-                    </div>
-                  </div>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 items-center mb-4 print:hidden">
+              <div className="flex-1 min-w-[200px] flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedDeniers(['ALL'])}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition whitespace-nowrap ${selectedDeniers.includes('ALL') ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                >
+                  {language === 'ta' ? 'அனைத்து டீனியர்கள்' : 'All Deniers'}
+                </button>
+                {denierFormulas.map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      let newSelection = selectedDeniers.filter(d => d !== 'ALL');
+                      if (newSelection.includes(f.denier)) {
+                        newSelection = newSelection.filter(d => d !== f.denier);
+                        if (newSelection.length === 0) newSelection = ['ALL'];
+                      } else {
+                        newSelection.push(f.denier);
+                      }
+                      setSelectedDeniers(newSelection);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition whitespace-nowrap ${selectedDeniers.includes(f.denier) ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                  >
+                    {f.denier}
+                  </button>
+                ))}
+              </div>
+              
+              <button 
+                onClick={() => setIsManagingFormulas(true)}
+                className="p-2 bg-white text-gray-500 rounded-xl shadow-sm border border-gray-200 hover:bg-gray-50"
+                title={language === 'ta' ? 'ஃபார்முலா செட்டிங்ஸ்' : 'Formula Settings'}
+              >
+                <Settings size={20} />
+              </button>
+            </div>
 
-                  {/* Date Range & Row Limit Filters */}
-                  <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
-                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
-                      <span className="text-xs font-bold text-gray-500">{language === 'ta' ? 'முதல்:' : 'From:'}</span>
-                      <input 
-                        type="date" 
-                        value={startDate} 
-                        onChange={e => setStartDate(e.target.value)} 
-                        className="bg-transparent text-xs font-bold outline-none" 
-                      />
-                      <span className="text-xs font-bold text-gray-500 ml-1">{language === 'ta' ? 'வரை:' : 'To:'}</span>
-                      <input 
-                        type="date" 
-                        value={endDate} 
-                        onChange={e => setEndDate(e.target.value)} 
-                        className="bg-transparent text-xs font-bold outline-none" 
-                      />
+            <div className="flex gap-2 mb-4 print:hidden">
+              <button 
+                onClick={() => setIsAddingDispatch(true)}
+                className="flex-1 py-2 bg-zinc-50 text-zinc-600 rounded-xl text-xs font-bold flex items-center justify-center gap-1 hover:bg-zinc-100 transition"
+              >
+                <ArrowDownLeft size={16} /> {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
+              </button>
+            </div>
+
+            {selectedDeniers.length > 0 ? (() => {
+              const isAll = selectedDeniers.includes('ALL');
+              let filteredDispatches = isAll 
+                ? warperDispatches 
+                : warperDispatches.filter(d => selectedDeniers.includes(d.yarnType));
+              
+              let filteredReturns = isAll
+                ? warperReturns
+                : warperReturns.filter(r => {
+                    if (r.sections) {
+                      return r.sections.some(s => selectedDeniers.some(denier => s.name.startsWith(denier)));
+                    }
+                    return selectedDeniers.some(denier => r.yarnType === denier || r.yarnType?.includes(denier));
+                  });
+
+              // Apply Date Filters
+              if (startDate) {
+                filteredDispatches = filteredDispatches.filter(d => d.date >= startDate);
+                filteredReturns = filteredReturns.filter(r => r.date >= startDate);
+              }
+              if (endDate) {
+                filteredDispatches = filteredDispatches.filter(d => d.date <= endDate);
+                filteredReturns = filteredReturns.filter(r => r.date <= endDate);
+              }
+
+              const dDispatches = filteredDispatches;
+              const dReturns = filteredReturns;
+              
+              const allDenierColors = Array.from(new Set([
+                ...dDispatches.filter(d => d.color).map(d => `${d.yarnType}|${d.color}`),
+                ...dReturns.flatMap(r => {
+                  if (r.sections) {
+                    return r.sections
+                      .filter(s => s.color && (isAll || selectedDeniers.some(denier => s.name.startsWith(denier))))
+                      .map(s => {
+                        const denier = s.name.split(' - ')[0];
+                        return `${denier}|${s.color}`;
+                      });
+                  }
+                  return r.color ? [`${r.yarnType}|${r.color}`] : [];
+                })
+              ])).filter(Boolean).sort();
+
+              const totalTableWidth = (columnWidths['date'] || 70) + 
+                                     (columnWidths['sno'] || 40) + 
+                                     (columnWidths['particulars'] || 150) + 
+                                     (columnWidths['ends'] || 50) +
+                                     (columnWidths['meters'] || 50) + 
+                                     allDenierColors.reduce((sum, dc) => sum + (columnWidths[dc] || baseColumnWidth), 0);
+
+              const groupedDispatches = Object.values(dDispatches.reduce((acc, d) => {
+                const key = d.createdAt || d.id;
+                if (!acc[key]) {
+                  acc[key] = { ...d, isDispatch: true, timestamp: new Date(d.date).getTime(), items: [] };
+                }
+                acc[key].items.push({ yarnType: d.yarnType, color: d.color, weightKg: d.weightKg });
+                acc[key].weightKg = acc[key].items.reduce((sum: number, item: any) => sum + item.weightKg, 0);
+                return acc;
+              }, {} as Record<string, any>));
+
+              const allTxns = [
+                ...groupedDispatches,
+                ...dReturns.map(r => ({ ...r, isDispatch: false, timestamp: new Date(r.date).getTime() }))
+              ].sort((a, b) => a.timestamp - b.timestamp);
+
+              const filteredTxns = allTxns.map(txn => {
+                const colorWeights: Record<string, number> = {};
+                let hasAnyWeight = false;
+                
+                allDenierColors.forEach(dc => {
+                  const [colDenier, colColor] = dc.split('|');
+                  let weight = 0;
+                  if (txn.isDispatch) {
+                    if (txn.items) {
+                      weight = txn.items
+                        .filter((i: any) => i.color === colColor && i.yarnType === colDenier)
+                        .reduce((sum: number, i: any) => sum + i.weightKg, 0);
+                    } else {
+                      if (txn.color === colColor && txn.yarnType === colDenier) weight = txn.weightKg;
+                    }
+                  } else {
+                    if (txn.sections) {
+                      weight = txn.sections
+                        .filter((s: any) => s.color === colColor && s.name.startsWith(colDenier))
+                        .reduce((sum: number, s: any) => sum + s.weightKg, 0);
+                    } else {
+                      if (txn.color === colColor && txn.yarnType === colDenier) weight = txn.weightKg;
+                    }
+                  }
+                  colorWeights[dc] = weight;
+                  if (weight > 0) hasAnyWeight = true;
+                });
+                
+                return { ...txn, colorWeights, hasAnyWeight };
+              }).filter(txn => txn.hasAnyWeight || isAll);
+
+              const limitedTxns = statementRowLimit === 'ALL' ? filteredTxns : filteredTxns.slice(-Number(statementRowLimit));
+
+              const runningBalances: Record<string, number> = {};
+              allDenierColors.forEach(dc => runningBalances[dc] = 0);
+
+              const downloadPDF = async () => {
+                if (!statementRef.current) return;
+                
+                // Use natural column widths to ensure perfect alignment and absolutely no text wrapping
+                const pdfColWidths = {
+                  date: columnWidths['date'] || 90,
+                  sno: columnWidths['sno'] || 45,
+                  particulars: columnWidths['particulars'] || 180,
+                  ends: columnWidths['ends'] || 55,
+                  meters: columnWidths['meters'] || 55
+                };
+                
+                const pdfDenierWidths: Record<string, number> = {};
+                allDenierColors.forEach(dc => {
+                  pdfDenierWidths[dc] = columnWidths[dc] || baseColumnWidth;
+                });
+
+                const pdfTotalTableWidth = pdfColWidths.date + pdfColWidths.sno + pdfColWidths.particulars + 
+                                         pdfColWidths.ends + pdfColWidths.meters + 
+                                         allDenierColors.reduce((sum, dc) => sum + pdfDenierWidths[dc], 0);
+
+                const element = statementRef.current;
+                const captureWidth = pdfTotalTableWidth + 60; // 30px padding on left/right for elegant spacing
+                const filename = `${selectedWarper.name}_statement_${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                const isLandscape = allDenierColors.length > 5;
+                const marginPoints = 20; // 20pt margin (~7mm)
+                
+                // Convert captureWidth (pixels) to points. 1 px = 0.75 points
+                const pageWidthPoints = (captureWidth * 0.75) + (marginPoints * 2);
+                
+                // Keep the classic A4 proportional aspects (landscape 1.414, portrait 0.707)
+                const aspectRatio = isLandscape ? 1.414 : 0.707;
+                const pageHeightPoints = pageWidthPoints / aspectRatio;
+
+                const opt = {
+                  margin: marginPoints,
+                  filename: filename,
+                  image: { type: 'jpeg' as const, quality: 0.98 },
+                  html2canvas: { 
+                    scale: 2.5, 
+                    useCORS: true, 
+                    letterRendering: true,
+                    width: captureWidth,
+                    windowWidth: captureWidth,
+                    scrollX: 0,
+                    scrollY: 0,
+                    onclone: (clonedDoc: Document) => {
+                      clonedDoc.body.style.width = `${captureWidth}px`;
+                      clonedDoc.body.style.maxWidth = 'none';
+                      clonedDoc.body.style.overflow = 'visible';
+                      clonedDoc.body.style.setProperty('-webkit-font-smoothing', 'antialiased');
+                      clonedDoc.body.style.setProperty('text-rendering', 'optimizeLegibility');
+                      
+                      const el = clonedDoc.getElementById('pdf-statement-content');
+                      if (el) {
+                        el.style.display = 'block';
+                        el.style.width = `${captureWidth}px`;
+                        el.style.minWidth = `${captureWidth}px`;
+                        el.style.maxWidth = 'none';
+                        el.style.padding = '25px';
+                        el.style.backgroundColor = '#ffffff';
+                        el.style.color = '#000000';
+                        el.style.fontFamily = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                        el.style.fontWeight = '800';
+                        
+                        // Force all parent elements in the clone to allow full width without cropping
+                        let parent = el.parentElement;
+                        while (parent && parent !== clonedDoc.body) {
+                          if (parent instanceof HTMLElement) {
+                            parent.style.width = `${captureWidth}px`;
+                            parent.style.minWidth = `${captureWidth}px`;
+                            parent.style.maxWidth = 'none';
+                            parent.style.overflow = 'visible';
+                          }
+                          parent = parent.parentElement;
+                        }
+
+                        // Force table container wrapper to not scroll and be fully visible
+                        const wrappers = el.querySelectorAll('.overflow-x-auto, .overflow-auto');
+                        wrappers.forEach(w => {
+                          if (w instanceof HTMLElement) {
+                            w.style.overflow = 'visible';
+                            w.style.overflowX = 'visible';
+                            w.style.width = '100%';
+                            w.style.maxWidth = 'none';
+                          }
+                        });
+                        
+                        // 1. Header Styling - High contrast bold black text for sharp printouts
+                        const topSection = el.querySelector('.mb-8.border-b-2');
+                        if (topSection instanceof HTMLElement) {
+                          topSection.style.marginBottom = '15px';
+                          topSection.style.paddingBottom = '10px';
+                          topSection.style.borderBottom = '3px solid #000000';
+                          topSection.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
+                              <div>
+                                <h1 style="font-size: 26px; font-weight: 900; color: #000000; margin: 0; text-transform: uppercase; letter-spacing: -0.5px;">
+                                  ${language === 'ta' ? 'வார்ப்புகாரர் கணக்கு அறிக்கை' : 'Warper Ledger Statement'}
+                                </h1>
+                                <div style="display: flex; gap: 15px; margin-top: 6px;">
+                                  <div style="display: flex; flex-direction: column;">
+                                    <span style="font-size: 11px; font-weight: 900; color: #000000; text-transform: uppercase;">${language === 'ta' ? 'வார்ப்புகாரர்' : 'Warper'}</span>
+                                    <span style="font-size: 19px; font-weight: 900; color: #000000;">${selectedWarper.name}</span>
+                                  </div>
+                                  ${selectedWarper.phone ? `<div style="width: 2px; background: #000000;"></div><div style="display: flex; flex-direction: column;"><span style="font-size: 11px; font-weight: 900; color: #000000; text-transform: uppercase;">Phone</span><span style="font-size: 19px; font-weight: 900; color: #000000;">${selectedWarper.phone}</span></div>` : ''}
+                                </div>
+                              </div>
+                              <div style="text-align: right;">
+                                <div style="font-size: 16px; font-weight: 900; color: #000000; background: #e5e7eb; padding: 6px 14px; border-radius: 4px; border: 1.5px solid #000000; display: inline-block;">
+                                  ${isAll ? (language === 'ta' ? 'அனைத்து டீனியர்கள்' : 'All Deniers') : `${selectedDeniers.join(', ')} DENIER`}
+                                </div>
+                                <div style="font-size: 13px; font-weight: 900; color: #000000; margin-top: 6px;">
+                                  Generated: ${new Date().toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                          `;
+                        }
+
+                        // 2. Table Scaling and Formatting - High contrast crisp bold black letters
+                        const table = el.querySelector('table');
+                        if (table instanceof HTMLElement) {
+                          table.style.width = '100%';
+                          table.style.borderCollapse = 'collapse';
+                          table.style.tableLayout = 'fixed';
+                          table.style.border = '2px solid #000000';
+                          table.style.fontSize = '12px';
+                          table.style.color = '#000000';
+                          table.style.fontWeight = '800';
+
+                          const ths = table.querySelectorAll('th');
+                          ths.forEach((th, i) => {
+                            if (th instanceof HTMLElement) {
+                              th.style.padding = '8px 5px';
+                              th.style.border = '1.5px solid #000000';
+                              th.style.backgroundColor = '#e5e7eb';
+                              th.style.color = '#000000';
+                              th.style.fontWeight = '900';
+                              th.style.fontSize = '12px';
+                              th.style.textTransform = 'uppercase';
+                              
+                              if (i === 0) th.style.width = `${pdfColWidths.date}px`;
+                              else if (i === 1) th.style.width = `${pdfColWidths.sno}px`;
+                              else if (i === 2) th.style.width = `${pdfColWidths.particulars}px`;
+                              else if (i === 3) th.style.width = `${pdfColWidths.ends}px`;
+                              else if (i === 4) th.style.width = `${pdfColWidths.meters}px`;
+                              else {
+                                const dc = allDenierColors[i - 5];
+                                if (dc) th.style.width = `${pdfDenierWidths[dc]}px`;
+                              }
+                            }
+                          });
+
+                          const tds = table.querySelectorAll('td');
+                          tds.forEach((td) => {
+                            if (td instanceof HTMLElement) {
+                              td.style.padding = '7px 5px';
+                              td.style.border = '1px solid #333333';
+                              td.style.fontWeight = '800';
+                              td.style.color = '#000000';
+                              if (td.classList.contains('whitespace-normal')) {
+                                td.style.lineHeight = '1.3';
+                              }
+                            }
+                          });
+
+                          // Ensure all child text elements in the table use bold black text
+                          const allChildElements = table.querySelectorAll('*');
+                          allChildElements.forEach(child => {
+                            if (child instanceof HTMLElement) {
+                              child.style.color = '#000000';
+                              child.style.fontWeight = '800';
+                              child.style.opacity = '1.0';
+                            }
+                          });
+
+                          const trs = table.querySelectorAll('tbody tr');
+                          trs.forEach((tr, idx) => {
+                             if (tr instanceof HTMLElement) {
+                               if (idx % 2 === 1) {
+                                 tr.style.backgroundColor = '#f4f4f5';
+                               } else {
+                                 tr.style.backgroundColor = '#ffffff';
+                               }
+                             }
+                          });
+
+                          const tfoot = table.querySelector('tfoot');
+                          if (tfoot instanceof HTMLElement) {
+                            tfoot.style.backgroundColor = '#000000';
+                            const footTds = tfoot.querySelectorAll('td');
+                            footTds.forEach(ftd => {
+                              if (ftd instanceof HTMLElement) {
+                                ftd.style.backgroundColor = '#000000';
+                                ftd.style.color = '#ffffff';
+                                ftd.style.fontWeight = '900';
+                                ftd.style.fontSize = '12.5px';
+                                ftd.style.border = '1px solid #000000';
+                                ftd.style.padding = '8px 5px';
+                              }
+                            });
+                          }
+                        }
+                      }
+                    }
+                  },
+                  jsPDF: { unit: 'pt', format: [pageWidthPoints, pageHeightPoints] as [number, number], orientation: isLandscape ? 'landscape' as const : 'portrait' as const }
+                };
+
+                try {
+                  // Generate the PDF and download it directly
+                  await html2pdf().set(opt).from(element).save();
+                } catch (error) {
+                  console.error('PDF generation error:', error);
+                  // Fallback for extreme cases (manual blob generation)
+                  const worker = html2pdf().set(opt).from(element);
+                  const blob = await worker.output('blob');
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', filename);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }
+              };
+
+              return (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-2 mb-4 print:hidden items-center">
+                    <button 
+                      onClick={() => {
+                        if (!showStatementPreview) {
+                          setShowStatementPreview(true);
+                        } else {
+                          downloadPDF();
+                        }
+                      }}
+                      className={`flex-1 py-3 rounded-2xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg ${showStatementPreview ? 'bg-emerald-600 text-white shadow-emerald-100' : 'bg-white text-emerald-600 border-2 border-emerald-100 hover:bg-emerald-50'}`}
+                    >
+                      {showStatementPreview ? <CheckCircle size={20} /> : <FileDown size={20} />}
+                      {showStatementPreview 
+                        ? (language === 'ta' ? 'PDF டவுன்லோட் செய்' : 'Download PDF Now') 
+                        : (language === 'ta' ? 'ஸ்டேட்மென்ட் எடு (Statement)' : 'Generate Statement')}
+                    </button>
+                    
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border border-gray-100 shadow-sm">
+                      <div className="flex flex-col">
+                        <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter leading-none">{language === 'ta' ? 'முதல்' : 'From'}</span>
+                        <input 
+                          type="date" 
+                          value={startDate} 
+                          onChange={e => setStartDate(e.target.value)}
+                          className="text-[10px] font-black text-zinc-800 outline-none bg-transparent h-4"
+                        />
+                      </div>
+                      <div className="w-px h-3 bg-gray-100 mx-0.5" />
+                      <div className="flex flex-col">
+                        <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter leading-none">{language === 'ta' ? 'வரை' : 'Until'}</span>
+                        <input 
+                          type="date" 
+                          value={endDate} 
+                          onChange={e => setEndDate(e.target.value)}
+                          className="text-[10px] font-black text-zinc-800 outline-none bg-transparent h-4"
+                        />
+                      </div>
                       {(startDate || endDate) && (
                         <button 
-                          onClick={() => { setStartDate(''); setEndDate(''); }} 
-                          className="ml-1 text-rose-500 hover:text-rose-700 text-xs font-bold"
+                          onClick={() => {setStartDate(''); setEndDate('');}}
+                          className="p-1 hover:bg-red-50 text-red-500 rounded-lg transition"
                         >
-                          {language === 'ta' ? 'அழி' : 'Clear'}
+                          <X size={12} />
                         </button>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 ml-auto">
-                      <span className="text-xs font-bold text-gray-500">{language === 'ta' ? 'வரிசைகள்:' : 'Rows:'}</span>
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'ta' ? 'எண்ணிக்கை' : 'Rows'}</span>
                       <select 
                         value={statementRowLimit} 
-                        onChange={e => setStatementRowLimit(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
-                        className="bg-transparent text-xs font-bold outline-none"
+                        onChange={(e) => setStatementRowLimit(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                        className="text-xs font-black text-zinc-800 outline-none bg-transparent"
                       >
                         <option value={25}>25</option>
                         <option value={50}>50</option>
                         <option value={100}>100</option>
-                        <option value="ALL">{language === 'ta' ? 'அனைத்தும்' : 'ALL'}</option>
+                        <option value={200}>200</option>
+                        <option value="ALL">{language === 'ta' ? 'அனைத்தும்' : 'All'}</option>
                       </select>
                     </div>
 
-                    <button 
-                      onClick={() => setIsEditingColumns(!isEditingColumns)} 
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${isEditingColumns ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    >
-                      <Settings size={14} />
-                      {isEditingColumns ? (language === 'ta' ? 'அளவை சேமி' : 'Save Column Sizes') : (language === 'ta' ? 'அளவை மாற்று' : 'Resize Columns')}
-                    </button>
+                    {showStatementPreview && (
+                      <button 
+                        onClick={() => setShowStatementPreview(false)}
+                        className="px-6 py-3 bg-gray-100 text-gray-600 rounded-2xl text-sm font-black hover:bg-gray-200 transition"
+                      >
+                        {language === 'ta' ? 'மூடு' : 'Close'}
+                      </button>
+                    )}
                   </div>
-                </div>
 
-                {/* Ledger Interactive Matrix Table */}
-                {(() => {
-                  const warperDispatches = dispatches.filter(d => d.recipientType === 'warper' && d.recipientId === selectedWarper.id);
-                  const warperReturns = returns.filter(r => r.warperId === selectedWarper.id);
+                  <div ref={statementRef} id="pdf-statement-content" style={{ width: showStatementPreview ? 'max-content' : '100%', minWidth: showStatementPreview ? `${totalTableWidth + 120}px` : '100%' }} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 relative mx-auto mb-10 overflow-visible">
+                    {/* Edit Controls (Moved to top-relative to prevent overlapping) - Hidden in Print/PDF */}
+                    <div className="flex flex-col items-end gap-2 mb-6 print:hidden">
+                      {isEditingColumns && (
+                        <div className="bg-blue-50/90 backdrop-blur-sm p-3 rounded-2xl border border-blue-100 shadow-xl max-w-[200px] animate-in fade-in zoom-in-95">
+                          <p className="text-[10px] text-blue-700 font-black text-center leading-tight">
+                            {selectedColForPinch 
+                              ? (language === 'ta' ? `தேர்வு: ${selectedColForPinch}. ஜூம் செய்து அளவை மாற்றவும்.` : `Selected: ${selectedColForPinch}. Pinch to resize.`)
+                              : (language === 'ta' ? 'காலத்தை தொட்டு பிறகு ஜூம் செய்யவும்' : 'Tap header then pinch to resize.')}
+                          </p>
+                          {selectedColForPinch && (
+                            <button 
+                              onClick={() => setSelectedColForPinch(null)}
+                              className="w-full mt-2 py-1.5 bg-blue-600 text-white text-[10px] font-black rounded-lg shadow-lg shadow-blue-100 uppercase"
+                            >
+                              {language === 'ta' ? 'சரி' : 'Done'}
+                            </button>
+                          )}
+                        </div>
+                      )}
 
-                  // Extract all unique Deniers / Colors
-                  const denierColorSet = new Set<string>();
-
-                  warperDispatches.forEach(d => {
-                    if (d.items && Array.isArray(d.items)) {
-                      d.items.forEach((item: any) => {
-                        const key = `${item.yarnType || ''} ${item.color || ''}`.trim() || item.color || 'Default';
-                        denierColorSet.add(key);
-                      });
-                    } else if (d.color) {
-                      const key = `${d.yarnType || ''} ${d.color}`.trim();
-                      denierColorSet.add(key);
-                    }
-                  });
-
-                  warperReturns.forEach(r => {
-                    if (r.sections && Array.isArray(r.sections)) {
-                      r.sections.forEach((sec: any) => {
-                        if (sec.color) {
-                          const denierName = sec.name ? sec.name.split(' - ')[0] : (r.yarnType || '');
-                          const key = `${denierName} ${sec.color}`.trim() || sec.color;
-                          denierColorSet.add(key);
-                        }
-                      });
-                    } else if (r.color) {
-                      const key = `${r.yarnType || ''} ${r.color}`.trim();
-                      denierColorSet.add(key);
-                    }
-                  });
-
-                  const allDenierColors = Array.from(denierColorSet).sort();
-
-                  // Map all transactions
-                  const allTxnsFormatted = [
-                    ...warperDispatches.map(d => {
-                      const weights: Record<string, number> = {};
-                      allDenierColors.forEach(dc => { weights[dc] = 0; });
-
-                      if (d.items && Array.isArray(d.items)) {
-                        d.items.forEach((item: any) => {
-                          const key = `${item.yarnType || ''} ${item.color || ''}`.trim() || item.color || 'Default';
-                          if (weights[key] !== undefined) weights[key] += item.weightKg || 0;
-                        });
-                      } else if (d.color) {
-                        const key = `${d.yarnType || ''} ${d.color}`.trim();
-                        if (weights[key] !== undefined) weights[key] += d.weightKg || 0;
-                      }
-
-                      return {
-                        ...d,
-                        isDispatch: true,
-                        timestamp: new Date(d.date).getTime(),
-                        colorWeights: weights
-                      };
-                    }),
-                    ...warperReturns.map(r => {
-                      const weights: Record<string, number> = {};
-                      allDenierColors.forEach(dc => { weights[dc] = 0; });
-
-                      let totalEnds = r.ends || 0;
-                      let totalMeters = r.length || 0;
-
-                      if (r.sections && Array.isArray(r.sections)) {
-                        totalEnds = r.sections.reduce((sum, sec) => sum + (sec.ends || 0), 0);
-                        r.sections.forEach((sec: any) => {
-                          if (sec.color) {
-                            const denierName = sec.name ? sec.name.split(' - ')[0] : (r.yarnType || '');
-                            const key = `${denierName} ${sec.color}`.trim() || sec.color;
-                            if (weights[key] !== undefined) weights[key] += sec.weightKg || 0;
-                          }
-                        });
-                      } else if (r.color) {
-                        const key = `${r.yarnType || ''} ${r.color}`.trim();
-                        if (weights[key] !== undefined) weights[key] += r.weightKg || 0;
-                      }
-
-                      return {
-                        ...r,
-                        isDispatch: false,
-                        ends: totalEnds,
-                        meters: totalMeters,
-                        timestamp: new Date(r.date).getTime(),
-                        colorWeights: weights
-                      };
-                    })
-                  ].sort((a, b) => a.timestamp - b.timestamp);
-
-                  // Filter by date
-                  let filteredTxns = allTxnsFormatted;
-                  if (startDate) {
-                    filteredTxns = filteredTxns.filter(t => t.date >= startDate);
-                  }
-                  if (endDate) {
-                    filteredTxns = filteredTxns.filter(t => t.date <= endDate);
-                  }
-
-                  const displayTxns = statementRowLimit === 'ALL' ? filteredTxns : filteredTxns.slice(0, statementRowLimit);
-
-                  if (allDenierColors.length === 0 && filteredTxns.length === 0) {
-                    return (
-                      <div className="bg-white p-12 rounded-3xl border border-dashed border-gray-200 text-center">
-                        <p className="text-gray-400 font-bold text-base tamil-font">
-                          {language === 'ta' ? 'கணக்கு பதிவுகள் எதுவும் இல்லை' : 'No ledger records found'}
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                      <div className="overflow-x-auto max-w-full">
-                        <table className="w-full text-xs text-left border-collapse">
-                          <thead>
-                            <tr className="bg-zinc-900 text-white font-black">
-                              <th style={{ width: columnWidths['date'] || 90, minWidth: columnWidths['date'] || 90 }} className="p-2.5 border border-zinc-800">{language === 'ta' ? 'தேதி' : 'Date'}</th>
-                              <th style={{ width: columnWidths['sno'] || 45, minWidth: columnWidths['sno'] || 45 }} className="p-2.5 border border-zinc-800 text-center">{language === 'ta' ? 'வ.எண்' : 'S.No'}</th>
-                              <th style={{ width: columnWidths['particulars'] || 180, minWidth: columnWidths['particulars'] || 180 }} className="p-2.5 border border-zinc-800">{language === 'ta' ? 'விவரம்' : 'Particulars'}</th>
-                              <th style={{ width: columnWidths['ends'] || 55, minWidth: columnWidths['ends'] || 55 }} className="p-2.5 border border-zinc-800 text-center">{language === 'ta' ? 'இழை' : 'Ends'}</th>
-                              <th style={{ width: columnWidths['meters'] || 55, minWidth: columnWidths['meters'] || 55 }} className="p-2.5 border border-zinc-800 text-center">{language === 'ta' ? 'மீட்டர்' : 'Meters'}</th>
-                              {allDenierColors.map(dc => {
-                                const width = columnWidths[dc] || (isEditingColumns ? baseColumnWidth : null);
-                                return (
-                                  <th key={dc} style={width ? { minWidth: `${width}px`, width: `${width}px` } : {}} className="p-2.5 border border-zinc-800 text-right whitespace-normal break-words leading-tight">
-                                    {dc}
-                                  </th>
-                                );
-                              })}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {displayTxns.length === 0 ? (
-                              <tr>
-                                <td colSpan={5 + allDenierColors.length} className="p-8 text-center text-gray-400 font-bold">
-                                  {language === 'ta' ? 'பதிவுகள் எதுவும் இல்லை' : 'No records found'}
-                                </td>
-                              </tr>
-                            ) : (
-                              displayTxns.map((txn: any, idx: number) => {
-                                let particularsText = '';
-                                if (txn.isDispatch) {
-                                  particularsText = language === 'ta' ? 'நூல் வரவு' : 'Yarn Given';
-                                  if (txn.supplierName) particularsText += ` - ${txn.supplierName}`;
-                                  if (txn.billNumber) particularsText += ` (Bill: ${txn.billNumber})`;
-                                } else {
-                                  const order = warpOrders.find(o => o.id === txn.orderId);
-                                  const weaverName = order?.weaverName || txn.weaverName;
-                                  const orderNumber = order?.orderNumber || txn.orderNumber;
-
-                                  const baseText = weaverName && weaverName !== 'Unknown'
-                                    ? `${weaverName} ${orderNumber ? `(${orderNumber})` : ''}`
-                                    : `${language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'} ${orderNumber ? `(${orderNumber})` : ''}`;
-
-                                  let details = '';
-                                  if (txn.sections && txn.sections.length > 0) {
-                                    details = txn.sections.map((s: any) => `${s.color || ''} (${s.ends || 0})`).filter((d: string) => d !== ' (0)').join(', ');
-                                  } else if (txn.color) {
-                                    details = `${txn.color} (${txn.ends || 0})`;
-                                  }
-
-                                  particularsText = details ? `${baseText} - ${details}` : baseText;
-                                }
-
-                                return (
-                                  <tr key={txn.id || idx} className="hover:bg-gray-50/80 transition">
-                                    <td className="p-2 border border-gray-200 text-gray-600 font-medium">
-                                      {new Date(txn.date).toLocaleDateString()}
-                                    </td>
-                                    <td className="p-2 border border-gray-200 text-center text-gray-500 font-bold">
-                                      {idx + 1}
-                                    </td>
-                                    <td 
-                                      className="p-2 border border-gray-200 font-black text-indigo-700 cursor-pointer hover:underline whitespace-normal break-words leading-tight"
-                                      onClick={() => setSelectedTxnDetails(txn)}
-                                    >
-                                      {particularsText}
-                                    </td>
-                                    <td className="p-2 border border-gray-200 text-center font-bold text-gray-600">
-                                      {!txn.isDispatch && (txn.ends !== undefined && txn.ends !== null) ? txn.ends : '-'}
-                                    </td>
-                                    <td className="p-2 border border-gray-200 text-center font-bold text-gray-600">
-                                      {!txn.isDispatch && (txn.meters !== undefined && txn.meters !== null) ? txn.meters : '-'}
-                                    </td>
-                                    {allDenierColors.map(dc => {
-                                      const val = txn.colorWeights[dc] || 0;
-                                      return (
-                                        <td key={dc} className={`p-2 border border-gray-200 text-right font-black ${val > 0 ? (txn.isDispatch ? 'text-indigo-700' : 'text-emerald-700') : 'text-gray-300'}`}>
-                                          {val > 0 ? (txn.isDispatch ? `+${val.toFixed(2)}` : `-${val.toFixed(2)}`) : '-'}
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                );
-                              })
-                            )}
-                          </tbody>
-                          <tfoot className="bg-zinc-900 text-white font-black border-t-2 border-gray-200">
-                            <tr>
-                              <td colSpan={5} className="p-3 text-right uppercase tracking-wider text-[11px] bg-zinc-900 border-zinc-800">
-                                {language === 'ta' ? 'தற்போதைய இருப்பு (Total Balance):' : 'Total Balance:'}
-                              </td>
-                              {allDenierColors.map(dc => {
-                                const finalBal = filteredTxns.reduce((sum, t) => {
-                                  if (t.isDispatch) return sum + (t.colorWeights[dc] || 0);
-                                  return sum - (t.colorWeights[dc] || 0);
-                                }, 0);
-                                return (
-                                  <td key={dc} className={`p-3 border border-zinc-800 text-right font-black ${finalBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                    {finalBal.toFixed(2)}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          </tfoot>
-                        </table>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(language === 'ta' ? 'காலம் அளவுகளை மீட்டமைக்க வேண்டுமா?' : 'Reset column widths?')) {
+                              setColumnWidths({});
+                              setBaseColumnWidth(100);
+                              localStorage.removeItem(`viyabaari_column_widths_${user.uid || 'guest'}`);
+                              localStorage.removeItem(`viyabaari_base_column_width_${user.uid || 'guest'}`);
+                            }
+                          }}
+                          className="px-3 py-2 bg-zinc-50 text-zinc-400 text-[10px] font-black rounded-xl border border-zinc-100 hover:bg-gray-100 transition shadow-sm"
+                        >
+                          {language === 'ta' ? 'ரீசெட்' : 'Reset'}
+                        </button>
+                        <button 
+                          onClick={() => setIsEditingColumns(!isEditingColumns)}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all flex items-center gap-1.5 shadow-lg ${isEditingColumns ? 'bg-blue-600 text-white shadow-blue-100 scale-105' : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-100'}`}
+                        >
+                          {isEditingColumns ? <Check size={14} /> : <Edit2 size={12} />}
+                          {isEditingColumns ? (language === 'ta' ? 'முடிக்க' : 'Done') : (language === 'ta' ? 'காலம் திருத்து' : 'Edit Column')}
+                        </button>
                       </div>
                     </div>
-                  );
-                })()}
+
+                    {/* PDF/Screen Header */}
+                    <div className="mb-8 border-b-2 border-zinc-100 pb-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h1 className="text-2xl font-black text-zinc-900 mb-1 uppercase tracking-tight">{language === 'ta' ? 'வார்ப்புகாரர் கணக்கு அறிக்கை' : 'Warper Ledger Statement'}</h1>
+                          <p className="text-zinc-500 font-bold mb-4">{isAll ? (language === 'ta' ? 'அனைத்து டீனியர்கள்' : 'All Deniers') : `${selectedDeniers.join(', ')} DENIER`}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-1">{language === 'ta' ? 'தேதி' : 'Statement Date'}</p>
+                          <p className="font-bold text-zinc-800">{new Date().toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-end mt-2">
+                        <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                          <p className="text-zinc-400 text-xs font-black uppercase tracking-widest mb-1">{language === 'ta' ? 'வார்ப்புகாரர் விவரம்' : 'Warper Details'}</p>
+                          <p className="text-xl font-black text-zinc-800">{selectedWarper.name}</p>
+                          {selectedWarper.phone && <p className="text-base font-bold text-zinc-500 flex items-center gap-1"><span className="opacity-50">#</span> {selectedWarper.phone}</p>}
+                        </div>
+                        <div className="flex gap-6 text-right">
+                          {startDate && (
+                            <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                              <p className="text-zinc-400 text-xs font-black uppercase tracking-widest mb-1">{language === 'ta' ? 'முதல்' : 'From'}</p>
+                              <p className="font-black text-zinc-800 text-lg">{new Date(startDate).toLocaleDateString()}</p>
+                            </div>
+                          )}
+                          {endDate && (
+                            <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                              <p className="text-zinc-400 text-xs font-black uppercase tracking-widest mb-1">{language === 'ta' ? 'வரை' : 'To'}</p>
+                              <p className="font-black text-zinc-800 text-lg">{new Date(endDate).toLocaleDateString()}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto print:overflow-visible">
+                      <table className={`w-max text-left ${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'text-[9.5px]' : 'text-[11.5px]'} whitespace-nowrap border-collapse`}>
+                        <thead className="bg-gray-50 text-gray-500 font-bold border-b border-gray-100">
+                          <tr>
+                            <th 
+                              style={{ width: columnWidths['date'] || 90, minWidth: columnWidths['date'] || 90 }} 
+                              className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border relative group ${selectedColForPinch === 'date' ? 'bg-blue-100' : ''}`}
+                              onClick={() => isEditingColumns && setSelectedColForPinch('date')}
+                            >
+                              {language === 'ta' ? 'தேதி' : 'Date'}
+                              <div 
+                                onMouseDown={(e) => startResizing('date', e)}
+                                onTouchStart={(e) => startResizing('date', e)}
+                                className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent ${isEditingColumns ? 'group-hover:bg-blue-400/30' : 'pointer-events-none'} transition-colors`}
+                              />
+                            </th>
+                            <th 
+                              style={{ width: columnWidths['sno'] || 45, minWidth: columnWidths['sno'] || 45 }} 
+                              className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center relative group ${selectedColForPinch === 'sno' ? 'bg-blue-100' : ''}`}
+                              onClick={() => isEditingColumns && setSelectedColForPinch('sno')}
+                            >
+                              {language === 'ta' ? 'வ.எண்' : 'S.No'}
+                              <div 
+                                onMouseDown={(e) => startResizing('sno', e)}
+                                onTouchStart={(e) => startResizing('sno', e)}
+                                className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent ${isEditingColumns ? 'group-hover:bg-blue-400/30' : 'pointer-events-none'} transition-colors`}
+                              />
+                            </th>
+                            <th 
+                              style={{ width: columnWidths['particulars'] || 180, minWidth: columnWidths['particulars'] || 180 }} 
+                              className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border relative group ${selectedColForPinch === 'particulars' ? 'bg-blue-100' : ''}`}
+                              onClick={() => isEditingColumns && setSelectedColForPinch('particulars')}
+                            >
+                              {language === 'ta' ? 'விவரம்' : 'Particulars'}
+                              <div 
+                                onMouseDown={(e) => startResizing('particulars', e)}
+                                onTouchStart={(e) => startResizing('particulars', e)}
+                                className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent ${isEditingColumns ? 'group-hover:bg-blue-400/30' : 'pointer-events-none'} transition-colors`}
+                              />
+                            </th>
+                            <th 
+                              style={{ width: columnWidths['ends'] || 55, minWidth: columnWidths['ends'] || 55 }} 
+                              className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center relative group ${selectedColForPinch === 'ends' ? 'bg-blue-100' : ''}`}
+                              onClick={() => isEditingColumns && setSelectedColForPinch('ends')}
+                            >
+                              {language === 'ta' ? 'இழை' : 'Ends'}
+                              <div 
+                                onMouseDown={(e) => startResizing('ends', e)}
+                                onTouchStart={(e) => startResizing('ends', e)}
+                                className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent ${isEditingColumns ? 'group-hover:bg-blue-400/30' : 'pointer-events-none'} transition-colors`}
+                              />
+                            </th>
+                            <th 
+                              style={{ width: columnWidths['meters'] || 55, minWidth: columnWidths['meters'] || 55 }} 
+                              className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center relative group ${selectedColForPinch === 'meters' ? 'bg-blue-100' : ''}`}
+                              onClick={() => isEditingColumns && setSelectedColForPinch('meters')}
+                            >
+                              {language === 'ta' ? 'மீட்டர்' : 'Meter'}
+                              <div 
+                                onMouseDown={(e) => startResizing('meters', e)}
+                                onTouchStart={(e) => startResizing('meters', e)}
+                                className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent ${isEditingColumns ? 'group-hover:bg-blue-400/30' : 'pointer-events-none'} transition-colors`}
+                              />
+                            </th>
+                            {allDenierColors.map(dc => {
+                              const [denier, color] = dc.split('|');
+                              const width = columnWidths[dc] || baseColumnWidth;
+                              return (
+                                <th 
+                                  key={dc} 
+                                  style={{ minWidth: `${width}px`, width: `${width}px` }} 
+                                  className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-right text-zinc-600 relative group ${selectedColForPinch === dc ? 'bg-blue-100' : ''}`}
+                                  onClick={() => isEditingColumns && setSelectedColForPinch(dc)}
+                                >
+                                  <div className="flex flex-col items-end">
+                                    <span>{color}</span>
+                                    <span className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'text-[8.5px]' : 'text-[10.5px]'} text-gray-400 font-normal`}>{denier}</span>
+                                  </div>
+                                  <div 
+                                    onMouseDown={(e) => startResizing(dc, e)}
+                                    onTouchStart={(e) => startResizing(dc, e)}
+                                    className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent ${isEditingColumns ? 'group-hover:bg-blue-400/30' : 'pointer-events-none'} transition-colors`}
+                                  />
+                                </th>
+                              );
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {(() => {
+                            const openingBalances: Record<string, number> = {};
+                            allDenierColors.forEach(dc => openingBalances[dc] = 0);
+
+                            const limit = statementRowLimit === 'ALL' ? filteredTxns.length : Number(statementRowLimit);
+                            const startIndex = Math.max(0, filteredTxns.length - limit);
+                            const previousTxns = filteredTxns.slice(0, startIndex);
+                            
+                            previousTxns.forEach(txn => {
+                              allDenierColors.forEach(dc => {
+                                if (txn.isDispatch) openingBalances[dc] += txn.colorWeights[dc] || 0;
+                                else openingBalances[dc] -= txn.colorWeights[dc] || 0;
+                              });
+                            });
+
+                            const rows = [];
+                            
+                            // Add Opening Balance Row if limited
+                            if (statementRowLimit !== 'ALL' && filteredTxns.length > Number(statementRowLimit)) {
+                              rows.push(
+                                <tr key="opening" className="bg-amber-50/30 font-bold border-b border-amber-100/50">
+                                  <td className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center text-amber-700 italic`}>-</td>
+                                  <td className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center text-amber-700 italic`}>0</td>
+                                  <td className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-amber-700 font-black italic`}>
+                                    {language === 'ta' ? 'ஆரம்ப இருப்பு (Opening Balance)' : 'Opening Balance'}
+                                  </td>
+                                  <td className="border"></td>
+                                  <td className="border"></td>
+                                  {allDenierColors.map(dc => (
+                                    <td key={dc} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-right text-amber-700`}>
+                                      {openingBalances[dc] !== 0 ? openingBalances[dc].toFixed(2) : '-'}
+                                    </td>
+                                  ))}
+                                </tr>
+                              );
+                            }
+
+                            if (limitedTxns.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={5 + allDenierColors.length} className="p-8 text-center text-gray-400">
+                                    {language === 'ta' ? 'பதிவுகள் இல்லை' : 'No records found'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            const running = { ...openingBalances };
+                            const mainRows = limitedTxns.map((txn: any, idx: number) => {
+                              allDenierColors.forEach(dc => {
+                                if (txn.isDispatch) running[dc] += txn.colorWeights[dc] || 0;
+                                else running[dc] -= txn.colorWeights[dc] || 0;
+                              });
+                              
+                              let particularsText = '';
+                              if (txn.isDispatch) {
+                                particularsText = language === 'ta' ? 'நூல் வரவு' : 'Yarn Given';
+                                if (txn.supplierName) particularsText += ` - ${txn.supplierName}`;
+                                if (txn.billNumber) particularsText += ` (Bill: ${txn.billNumber})`;
+                              } else {
+                                const order = warpOrders.find(o => o.id === txn.orderId);
+                                const weaverName = order?.weaverName || txn.weaverName;
+                                const orderNumber = order?.orderNumber || txn.orderNumber;
+                                
+                                const baseText = weaverName && weaverName !== 'Unknown' 
+                                  ? `${weaverName} ${orderNumber ? `(${orderNumber})` : ''}`
+                                  : `${language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'} ${orderNumber ? `(${orderNumber})` : ''}`;
+
+                                // Add color and ends count to the particulars as requested
+                                let details = '';
+                                if (txn.sections && txn.sections.length > 0) {
+                                  details = txn.sections.map((s: any) => `${s.color || ''} (${s.ends || 0})`).filter((d: string) => d !== ' (0)').join(', ');
+                                } else if (txn.color) {
+                                  details = `${txn.color} (${txn.ends || 0})`;
+                                }
+                                
+                                particularsText = details ? `${baseText} - ${details}` : baseText;
+                              }
+                              
+                              return (
+                                <tr key={txn.id} className="hover:bg-gray-50/50 transition">
+                                  <td style={{ width: columnWidths['date'] || 90, minWidth: columnWidths['date'] || 90 }} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-gray-500`}>{new Date(txn.date).toLocaleDateString()}</td>
+                                  <td style={{ width: columnWidths['sno'] || 45, minWidth: columnWidths['sno'] || 45 }} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-gray-500 font-medium text-center`}>{startIndex + idx + 1}</td>
+                                  <td 
+                                    style={{ width: columnWidths['particulars'] || 180, minWidth: columnWidths['particulars'] || 180 }}
+                                    className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border font-black text-blue-700 cursor-pointer hover:underline whitespace-normal break-words leading-tight`}
+                                    onClick={() => setSelectedTxnDetails(txn)}
+                                  >
+                                    {particularsText}
+                                  </td>
+                                  <td style={{ width: columnWidths['ends'] || 55, minWidth: columnWidths['ends'] || 55 }} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center font-bold text-gray-600`}>
+                                    {!txn.isDispatch && (txn.ends !== undefined && txn.ends !== null) ? txn.ends : '-'}
+                                  </td>
+                                  <td style={{ width: columnWidths['meters'] || 55, minWidth: columnWidths['meters'] || 55 }} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center font-bold text-gray-600`}>
+                                    {!txn.isDispatch && (txn.meters !== undefined && txn.meters !== null) ? txn.meters : '-'}
+                                  </td>
+                                  {allDenierColors.map(dc => {
+                                    const val = txn.colorWeights[dc] || 0;
+                                    const width = columnWidths[dc] || (isEditingColumns ? baseColumnWidth : null);
+                                    return (
+                                      <td key={dc} style={width ? { minWidth: `${width}px`, width: `${width}px` } : {}} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-right font-black ${val > 0 ? (txn.isDispatch ? 'text-zinc-700' : 'text-emerald-700') : 'text-gray-300'}`}>
+                                        {val > 0 ? (txn.isDispatch ? `+${val.toFixed(2)}` : `-${val.toFixed(2)}`) : ''}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            });
+                            return [...rows, ...mainRows];
+                          })()}
+                        </tbody>
+                        <tfoot className="bg-zinc-900 text-white font-black border-t-2 border-gray-200 sticky bottom-0 z-20">
+                          <tr>
+                            <td colSpan={5} className="p-3 text-right uppercase tracking-widest text-[11px] bg-zinc-900 border-zinc-800">
+                              {language === 'ta' ? 'தற்போதைய இருப்பு (Total Balance):' : 'Total Balance:'}
+                            </td>
+                            {allDenierColors.map(dc => {
+                              const finalBal = filteredTxns.reduce((sum, t) => {
+                                if (t.isDispatch) return sum + (t.colorWeights[dc] || 0);
+                                return sum - (t.colorWeights[dc] || 0);
+                              }, 0);
+                              const width = columnWidths[dc] || (isEditingColumns ? baseColumnWidth : null);
+                              return (
+                                <td key={dc} style={width ? { minWidth: `${width}px`, width: `${width}px` } : {}} className={`p-3 border border-zinc-800 text-right ${finalBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                  {finalBal.toFixed(2)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+              </div>
+              );
+            })() : (
+              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200 shadow-sm">
+                <FileText size={32} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-gray-500 font-bold tamil-font text-sm">
+                  {language === 'ta' ? 'டீனியரை தேர்ந்தெடுக்கவும்' : 'Select a Denier'}
+                </p>
               </div>
             )}
+          </div>
+        )}
 
-
-
-
-
-
-
-
-
-
-                
-
-
-
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            {viewType === 'orders' && (
-              <div className="space-y-4">
+        {viewType === 'orders' && (
+          <div className="space-y-4">
             <div className="flex justify-end mb-2">
               <button 
                 onClick={() => {

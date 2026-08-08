@@ -28,9 +28,9 @@ export interface WarperReturn {
   warpNumber?: string;
   weaverName?: string;
   date: string;
-  yarnType?: string;
-  color?: string;
-  weightKg?: number;
+  yarnType: string;
+  color: string;
+  weightKg: number;
   ends?: number;
   length?: number;
   orderId?: string;
