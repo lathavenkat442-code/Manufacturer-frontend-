@@ -2668,19 +2668,11 @@ const Warpers: React.FC<WarpersProps> = ({
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2 mb-4 print:hidden items-center">
                     <button 
-                      onClick={() => {
-                        if (!showStatementPreview) {
-                          setShowStatementPreview(true);
-                        } else {
-                          downloadPDF();
-                        }
-                      }}
-                      className={`flex-1 py-3 rounded-2xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg ${showStatementPreview ? 'bg-emerald-600 text-white shadow-emerald-100' : 'bg-white text-emerald-600 border-2 border-emerald-100 hover:bg-emerald-50'}`}
+                      onClick={() => setViewStatement(selectedWarper.id)}
+                      className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-black flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-100"
                     >
-                      {showStatementPreview ? <CheckCircle size={20} /> : <FileDown size={20} />}
-                      {showStatementPreview 
-                        ? (language === 'ta' ? 'PDF டவுன்லோட் செய்' : 'Download PDF Now') 
-                        : (language === 'ta' ? 'ஸ்டேட்மென்ட் எடு (Statement)' : 'Generate Statement')}
+                      <FileDown size={20} />
+                      {language === 'ta' ? 'ஸ்டேட்மென்ட் எடு (Statement)' : 'Generate Statement'}
                     </button>
                     
                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border border-gray-100 shadow-sm">
