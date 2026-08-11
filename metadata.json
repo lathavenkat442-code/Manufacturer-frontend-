@@ -3,5 +3,8 @@
   "description": "An easy-to-use Tamil accounting and inventory management  with photo-based stock tracking and income/expense monitoring,billing \nUsing with all systems like laptops, computers, mobile tablet compatible ",
   "requestFramePermissions": [
     "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }

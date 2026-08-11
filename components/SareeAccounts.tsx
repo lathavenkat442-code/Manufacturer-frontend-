@@ -4,6 +4,7 @@ import { Plus, ArrowLeft, Calendar, ChevronDown, ChevronUp, X, Send, CheckCircle
 import { YARN_COLORS, YARN_TYPES } from '../constants';
 import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
+import { useConfirm } from '../context/ConfirmContext';
 import html2pdf from 'html2pdf.js';
 
 // --- Transaction Row Component ---
@@ -97,6 +98,7 @@ interface SareeAccountsProps {
 export const SareeAccounts: React.FC<SareeAccountsProps> = ({ 
   user, weaverId, weaverName, language, onAddTransaction, onNavigateToStock
 }) => {
+  const confirm = useConfirm();
   const [looms, setLooms] = useState<Loom[]>([]);
   const [transactions, setTransactions] = useState<LoomTransaction[]>([]);
   
@@ -369,16 +371,24 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
     } : l));
   };
 
-  const handleDeleteLoom = (loomId: string) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த தறியை நீக்க வேண்டுமா? இதனுடன் தொடர்புடைய அனைத்து பதிவுகளும் நீக்கப்படும்!' : 'Are you sure you want to delete this loom? All associated transactions will be deleted!')) {
+  const handleDeleteLoom = async (loomId: string) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'நிச்சயமாக இந்த தறியை நீக்க வேண்டுமா? இதனுடன் தொடர்புடைய அனைத்து பதிவுகளும் நீக்கப்படும்!' : 'Are you sure you want to delete this loom? All associated transactions will be deleted!'
+    );
+    if (isConfirmed) {
       saveLooms(looms.filter(l => l.id !== loomId));
       saveTransactions(transactions.filter(t => t.loomId !== loomId));
+      confirm.showSuccess(language === 'ta' ? 'தறி வெற்றிகரமாக நீக்கப்பட்டது!' : 'Loom deleted successfully!');
     }
   };
 
-  const handleDeleteTransaction = (txnId: string) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த பதிவை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this transaction?')) {
+  const handleDeleteTransaction = async (txnId: string) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'நிச்சயமாக இந்த பதிவை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this transaction?'
+    );
+    if (isConfirmed) {
       saveTransactions(transactions.filter(t => t.id !== txnId));
+      confirm.showSuccess(language === 'ta' ? 'பதிவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Transaction deleted successfully!');
     }
   };
 
@@ -404,21 +414,21 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
     }
   };
 
-  const handleCreateWarpOrder = (loom: Loom) => {
+  const handleCreateWarpOrder = async (loom: Loom) => {
     if (!loom.totalSareesExpected || !loom.warpLengthMeters || !loom.totalYarnWeight || !loom.sareeWage) {
-      alert(language === 'ta' ? 'முதலில் வார்ப்பு விவரங்களை நிரப்பவும்' : 'Please fill warp details first');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து முதலில் வார்ப்பு விவரங்களை நிரப்பவும்' : 'Please fill warp details first');
       return;
     }
 
     if (!selectedWarperId) {
-      alert(language === 'ta' ? 'வார்ப்புகாரரை தேர்ந்தெடுக்கவும்' : 'Please select a warper');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து வார்ப்புகாரரை தேர்ந்தெடுக்கவும்' : 'Please select a warper');
       return;
     }
     
     // Check for existing pending order
     const existingPendingOrder = warpOrders.find(o => o.loomId === loom.id && o.status !== 'COMPLETED');
     if (existingPendingOrder) {
-      alert(language === 'ta' ? 'இந்த தறிக்கு ஏற்கனவே வார்ப்பு ஆர்டர் நிலுவையில் உள்ளது!' : 'A warp order is already pending for this loom!');
+      confirm.showError(language === 'ta' ? 'இந்த தறிக்கு ஏற்கனவே வார்ப்பு ஆர்டர் நிலுவையில் உள்ளது!' : 'A warp order is already pending for this loom!');
       return;
     }
 
@@ -436,11 +446,16 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
           ? `இன்னும் 75% சேலைகள் வரவில்லை (${sareesReceived}/${expected} மட்டுமே வந்துள்ளது). பரவாயில்லையா, புதிய வார்ப்பு ஆர்டர் கொடுக்க வேண்டுமா?` 
           : `Less than 75% sarees received (${sareesReceived}/${expected}). Are you sure you want to create a new warp order?`;
         
-        if (!window.confirm(confirmMsg)) {
-          return; // User cancelled
-        }
+        const ok = await confirm.confirmSave(confirmMsg, language === 'ta' ? 'உறுதிப்படுத்தல்' : 'Confirmation');
+        if (!ok) return;
       }
     }
+
+    const okOrder = await confirm.confirmSave(
+      language === 'ta' ? 'புதிய வார்ப்பு ஆர்டரை உருவாக்க விரும்புகிறீர்களா?' : 'Do you want to create a new warp order?',
+      language === 'ta' ? 'வார்ப்பு ஆர்டர் உருவாக்கம்' : 'Create Warp Order'
+    );
+    if (!okOrder) return;
     
     const newOrder: WarpOrder = {
       id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
@@ -466,7 +481,7 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
     
     setIsCreatingWarpOrder(null);
     setSelectedWarperId('');
-    alert(language === 'ta' ? 'புதிய வார்ப்பு ஆர்டர் வெற்றிகரமாக உருவாக்கப்பட்டது!' : 'New Warp Order created successfully!');
+    confirm.showSuccess(language === 'ta' ? 'புதிய வார்ப்பு ஆர்டர் வெற்றிகரமாக உருவாக்கப்பட்டது!' : 'New Warp Order created successfully!');
   };
 
   const handleWarpTypeChange = (type: WarpType) => {
@@ -2068,10 +2083,14 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
                             <Share2 size={16} />
                           </button>
                           <button 
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த கணக்கை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this completed record?')) {
+                              const isConfirmed = await confirm.confirmDelete(
+                                language === 'ta' ? 'நிச்சயமாக இந்த கணக்கை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this completed record?'
+                              );
+                              if (isConfirmed) {
                                 saveWarpOrders(warpOrders.filter(o => o.id !== order.id));
+                                confirm.showSuccess(language === 'ta' ? 'கணக்கு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Record deleted successfully!');
                               }
                             }}
                             className="p-1 text-rose-600 hover:bg-rose-50 rounded transition-colors"

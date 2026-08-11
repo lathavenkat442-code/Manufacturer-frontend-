@@ -4,6 +4,7 @@ import { Plus, User as UserIcon, Trash2, ArrowLeft, Calendar, Palette, Weight, P
 import { YARN_COLORS, YARN_TYPES } from '../constants';
 import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
+import { useConfirm } from '../context/ConfirmContext';
 import { WarperStatementView } from './WarperStatementView';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -371,6 +372,7 @@ const Warpers: React.FC<WarpersProps> = ({
   onBack, 
   onAddTransaction, 
 }) => {
+  const confirm = useConfirm();
   const [warpers, setWarpers] = useState<Warper[]>([]);
   const [dispatches, setDispatches] = useState<YarnDispatch[]>([]);
   const [returns, setReturns] = useState<WarperReturn[]>([]);
@@ -800,16 +802,23 @@ const Warpers: React.FC<WarpersProps> = ({
     localStorage.setItem(`viyabaari_weavers_${user.uid || 'guest'}`, JSON.stringify(newWeavers));
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newName.trim()) {
-      alert(language === 'ta' ? 'பெயரை உள்ளிடவும்' : 'Please enter a name');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து வார்ப்பர் பெயரை உள்ளிடவும்' : 'Please enter a warper name');
       return;
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? `${newName.trim()} - வார்ப்பர் விவரங்களை சேமிக்க விரும்புகிறீர்களா?` : 'Do you want to save warper details?',
+      language === 'ta' ? 'வார்ப்பர் பதிவு சேமிப்பு' : 'Confirm Save'
+    );
+    if (!isConfirmed) return;
+
     if (editingWarper) {
       const updated = warpers.map(w => w.id === editingWarper.id ? { ...w, name: newName, phone: newPhone } : w);
       saveWarpers(updated);
       setEditingWarper(null);
-      alert(language === 'ta' ? 'விவரங்கள் மாற்றப்பட்டது!' : 'Details updated!');
+      confirm.showSuccess(language === 'ta' ? 'வார்ப்பர் விவரங்கள் வெற்றிகரமாக மாற்றப்பட்டன!' : 'Warper details updated!');
     } else {
       const newWarper: Warper = {
         id: Date.now().toString(),
@@ -818,7 +827,7 @@ const Warpers: React.FC<WarpersProps> = ({
         createdAt: Date.now()
       };
       saveWarpers([...warpers, newWarper]);
-      alert(language === 'ta' ? 'வார்ப்பர் வெற்றிகரமாக சேர்க்கப்பட்டார்!' : 'Warper added successfully!');
+      confirm.showSuccess(language === 'ta' ? 'வார்ப்பர் வெற்றிகரமாக சேர்க்கப்பட்டார்!' : 'Warper added successfully!');
     }
     setNewName('');
     setNewPhone('');
@@ -832,20 +841,24 @@ const Warpers: React.FC<WarpersProps> = ({
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமாக நீக்க வேண்டுமா?' : 'Are you sure you want to delete?')) {
+  const handleDelete = async (id: string) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'இந்த வார்ப்பரை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this warper?'
+    );
+    if (isConfirmed) {
       saveWarpers(warpers.filter(w => w.id !== id));
+      confirm.showSuccess(language === 'ta' ? 'வார்ப்பர் வெற்றிகரமாக நீக்கப்பட்டார்!' : 'Warper deleted successfully!');
     }
   };
 
-  const handleAddReturn = () => {
+  const handleAddReturn = async () => {
     if (!returnDate || !selectedWarper) {
-      alert(language === 'ta' ? 'தேதியை உள்ளிடவும்' : 'Please enter date');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து தேதியை தேர்வு செய்யவும்' : 'Please select date');
       return;
     }
     
     if (returnSections.some(s => !s.name || !s.color || (!s.weightKg && !s.ends))) {
-      alert(language === 'ta' ? 'அனைத்து இழைகளும் மற்றும் கலர்களும் சரியாக உள்ளிடவும்' : 'Please fill all ends and colors correctly');
+      confirm.showError(language === 'ta' ? 'அனைத்து இழைகளும் மற்றும் கலர்களும் சரியாக உள்ளிடவும்' : 'Please fill all ends and colors correctly');
       return;
     }
 
@@ -869,9 +882,15 @@ const Warpers: React.FC<WarpersProps> = ({
     const uniqueColors = Array.from(new Set(finalSections.map(s => s.color))).filter(Boolean).join(', ');
 
     if (totalWeight <= 0) {
-      alert(language === 'ta' ? 'எடை அல்லது இழை அளவு தேவை' : 'Weight or Ends required');
+      confirm.showError(language === 'ta' ? 'எடை அல்லது இழை அளவு சரியாக உள்ளிடவும்' : 'Weight or Ends required');
       return;
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? 'வார்ப்பு வரவு விவரங்களை சேமிக்க விரும்புகிறீர்களா?' : 'Do you want to save warp return details?',
+      language === 'ta' ? 'வார்ப்பு வரவு சேமிப்பு' : 'Confirm Save'
+    );
+    if (!isConfirmed) return;
 
     const weaver = weavers.find(w => w.id === returnWeaverId);
     const existingReturn = editingReturnId ? returns.find(r => r.id === editingReturnId) : null;
@@ -909,26 +928,32 @@ const Warpers: React.FC<WarpersProps> = ({
     setReturnWeaverName('');
     setIsAddingReturn(false);
     setEditingReturnId(null);
-    alert(language === 'ta' ? 'வார்ப்பு வரவு வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Warp return saved successfully!');
+    confirm.showSuccess(language === 'ta' ? 'வார்ப்பு வரவு வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Warp return saved successfully!');
   };
 
-  const handleAddDispatch = () => {
+  const handleAddDispatch = async () => {
     if (!dispatchDate || dispatchItems.length === 0 || !selectedWarper) {
-      alert(language === 'ta' ? 'தேதியை உள்ளிடவும்' : 'Please enter date');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து தேதியை தேர்வு செய்யவும்' : 'Please select date');
       return;
     }
     
     // Validate all items
     for (const item of dispatchItems) {
       if (!item.denier || !item.color || !item.weight) {
-        alert(language === 'ta' ? 'அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all item details');
+        confirm.showError(language === 'ta' ? 'தயவுசெய்து அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all item details');
         return;
       }
-      if (isNaN(parseFloat(item.weight))) {
-        alert(language === 'ta' ? 'சரியான எடையை உள்ளிடவும்' : 'Please enter a valid weight');
+      if (isNaN(parseFloat(item.weight)) || parseFloat(item.weight) <= 0) {
+        confirm.showError(language === 'ta' ? 'தயவுசெய்து சரியான எடையை எண்களாக உள்ளிடவும்' : 'Please enter a valid weight');
         return;
       }
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? 'நூல் வரவு விவரங்களை சேமிக்க விரும்புகிறீர்களா?' : 'Do you want to save yarn dispatch details?',
+      language === 'ta' ? 'நூல் வரவு சேமிப்பு' : 'Confirm Save'
+    );
+    if (!isConfirmed) return;
     
     const selectedSupplier = suppliers.find(s => s.id === dispatchSupplierId);
     const now = Date.now();
@@ -963,7 +988,7 @@ const Warpers: React.FC<WarpersProps> = ({
     setDispatchBillNumber('');
     setIsAddingDispatch(false);
     setEditingDispatchId(null);
-    alert(language === 'ta' ? 'நூல் வரவு வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Yarn dispatch saved successfully!');
+    confirm.showSuccess(language === 'ta' ? 'நூல் வரவு வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Yarn dispatch saved successfully!');
   };
 
   const handleAddFormula = () => {
@@ -980,10 +1005,14 @@ const Warpers: React.FC<WarpersProps> = ({
     setNewFormulaDenier('');
     setNewFormulaMultiplier('');
     setIsCustomDenier(false);
+    confirm.showSuccess(language === 'ta' ? 'ஃபார்முலா சேமிக்கப்பட்டது!' : 'Formula saved!');
   };
 
-  const handleDeleteDispatch = (idOrTxn: string | any) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமாக நீக்க வேண்டுமா?' : 'Are you sure you want to delete?')) {
+  const handleDeleteDispatch = async (idOrTxn: string | any) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'இந்த நூல் வரவு பதிவை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this yarn dispatch?'
+    );
+    if (isConfirmed) {
       if (typeof idOrTxn === 'string') {
         saveDispatches(dispatches.filter(d => d.id !== idOrTxn));
       } else {
@@ -991,20 +1020,29 @@ const Warpers: React.FC<WarpersProps> = ({
         saveDispatches(dispatches.filter(d => (d.createdAt?.toString() || d.id).split('-')[0] !== groupKey));
         setSelectedTxnDetails(null);
       }
+      confirm.showSuccess(language === 'ta' ? 'நூல் வரவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Yarn dispatch deleted successfully!');
     }
   };
 
-  const handleDeleteReturn = (idOrTxn: string | any) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமாக நீக்க வேண்டுமா?' : 'Are you sure you want to delete?')) {
+  const handleDeleteReturn = async (idOrTxn: string | any) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'இந்த வார்ப்பு வரவு பதிவை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this warp return?'
+    );
+    if (isConfirmed) {
       const id = typeof idOrTxn === 'string' ? idOrTxn : idOrTxn.id;
       saveReturns(returns.filter(r => r.id !== id));
       if (typeof idOrTxn !== 'string') setSelectedTxnDetails(null);
+      confirm.showSuccess(language === 'ta' ? 'வார்ப்பு வரவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Warp return deleted successfully!');
     }
   };
 
-  const handleDeleteOrder = (id: string) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமாக நீக்க வேண்டுமா?' : 'Are you sure you want to delete?')) {
+  const handleDeleteOrder = async (id: string) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'இந்த வார்ப்பு ஆர்டரை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this warp order?'
+    );
+    if (isConfirmed) {
       saveWarpOrders(warpOrders.filter(o => o.id !== id));
+      confirm.showSuccess(language === 'ta' ? 'வார்ப்பு ஆர்டர் வெற்றிகரமாக நீக்கப்பட்டது!' : 'Warp order deleted successfully!');
     }
   };
 
@@ -1176,9 +1214,9 @@ const Warpers: React.FC<WarpersProps> = ({
     return (max + 1).toString();
   };
 
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     if (!selectedWarper) {
-      alert(language === 'ta' ? 'முதலில் வார்ப்பரை தேர்ந்தெடுக்கவும்' : 'Please select a warper first');
+      confirm.showError(language === 'ta' ? 'முதலில் வார்ப்பரை தேர்ந்தெடுக்கவும்' : 'Please select a warper first');
       return;
     }
 
@@ -1186,12 +1224,12 @@ const Warpers: React.FC<WarpersProps> = ({
     
     if (creatingOrderType === 'MAIN_WARP') {
       if (!orderDesignName || !orderWeftYarnType || !orderTotalSarees || !orderWarpWeight || !orderWarpLength || !orderNumber) {
-        alert(language === 'ta' ? 'அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
+        confirm.showError(language === 'ta' ? 'தயவுசெய்து அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
         return;
       }
 
       if (orderSections.some(s => !s.color || s.ends <= 0)) {
-        alert(language === 'ta' ? 'அனைத்து இழைகளும் மற்றும் கலர்களும் சரியாக உள்ளிடவும்' : 'Please fill all ends and colors correctly');
+        confirm.showError(language === 'ta' ? 'அனைத்து இழைகளும் மற்றும் கலர்களும் சரியாக உள்ளிடவும்' : 'Please fill all ends and colors correctly');
         return;
       }
 
@@ -1218,7 +1256,7 @@ const Warpers: React.FC<WarpersProps> = ({
       };
     } else if (creatingOrderType === 'ZARI_BOBBIN') {
       if (!orderDesignName || !zariYarnType || !zariColor || !zariBobbins || !zariEndsPerBobbin || !zariMeters || !zariWeight || !orderNumber) {
-        alert(language === 'ta' ? 'அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
+        confirm.showError(language === 'ta' ? 'தயவுசெய்து அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
         return;
       }
 
@@ -1247,12 +1285,12 @@ const Warpers: React.FC<WarpersProps> = ({
       };
     } else {
       if (!orderDesignName || !topWarpYarnType || !topWarpLengthMeters || !topWarpTotalYarnWeight || !orderNumber) {
-        alert(language === 'ta' ? 'அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
+        confirm.showError(language === 'ta' ? 'தயவுசெய்து அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
         return;
       }
 
       if (topWarpSections.some(s => !s.color || s.ends <= 0)) {
-        alert(language === 'ta' ? 'அனைத்து இழைகளும் மற்றும் கலர்களும் சரியாக உள்ளிடவும்' : 'Please fill all ends and colors correctly');
+        confirm.showError(language === 'ta' ? 'அனைத்து இழைகளும் மற்றும் கலர்களும் சரியாக உள்ளிடவும்' : 'Please fill all ends and colors correctly');
         return;
       }
 
@@ -1279,6 +1317,12 @@ const Warpers: React.FC<WarpersProps> = ({
         topWarpSections: topWarpSections
       };
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? 'புதிய வார்ப்பு ஆர்டரை சேமிக்க விரும்புகிறீர்களா?' : 'Do you want to save this warp order?',
+      language === 'ta' ? 'வார்ப்பு ஆர்டர் சேமிப்பு' : 'Confirm Order Save'
+    );
+    if (!isConfirmed) return;
 
     let updatedOrders;
     if (editingOrderId) {
@@ -1308,7 +1352,7 @@ const Warpers: React.FC<WarpersProps> = ({
     setTopWarpTotalYarnWeight('');
     setTopWarpSections([{ name: 'மேல் வார்ப்பு', ends: 0, color: '' }]);
     
-    setSuccessMessage(language === 'ta' ? 'புதிய வார்ப்பு ஆர்டர் வெற்றிகரமாக உருவாக்கப்பட்டது!' : 'New Warp Order created successfully!');
+    confirm.showSuccess(language === 'ta' ? 'புதிய வார்ப்பு ஆர்டர் வெற்றிகரமாக உருவாக்கப்பட்டது!' : 'New Warp Order created successfully!');
   };
 
   const resetDesignFields = useCallback(() => {
@@ -1333,12 +1377,18 @@ const Warpers: React.FC<WarpersProps> = ({
     setEditingDesignId(null);
   }, [language]);
 
-  const handleCreateDesign = () => {
+  const handleCreateDesign = async () => {
     if (!selectedWarper) return;
     if (!orderDesignName) {
-      alert(language === 'ta' ? 'டிசைன் பெயரை உள்ளிடவும்' : 'Please enter design name');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து டிசைன் பெயரை உள்ளிடவும்' : 'Please enter design name');
       return;
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? 'டிசைன் விவரங்களை சேமிக்க விரும்புகிறீர்களா?' : 'Do you want to save design details?',
+      language === 'ta' ? 'டிசைன் சேமிப்பு' : 'Confirm Design Save'
+    );
+    if (!isConfirmed) return;
 
     const uniqueDeniers = Array.from(new Set(orderSections.map(s => s.name.split(' - ')[0]))).filter(Boolean).join(', ');
 
@@ -1377,7 +1427,7 @@ const Warpers: React.FC<WarpersProps> = ({
     setIsCreatingDesign(false);
     resetDesignFields();
     
-    setSuccessMessage(language === 'ta' ? 'டிசைன் வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Design saved successfully!');
+    confirm.showSuccess(language === 'ta' ? 'டிசைன் வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Design saved successfully!');
   };
 
   const handleAssignOrder = () => {

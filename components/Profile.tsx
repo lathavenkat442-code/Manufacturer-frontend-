@@ -4,6 +4,7 @@ import { User, StockItem, Transaction, BackupFrequency } from '../types';
 import { LogOut, ShieldCheck, Download, FileSpreadsheet, HardDriveDownload, Globe, CheckCircle2, UploadCloud, Save, Cloud, Calendar, History, Settings, ToggleLeft, ToggleRight, Image, User as UserIcon, X, AlertTriangle, Eraser, Trash2, ChevronDown, Database, Wifi, WifiOff, Camera, Lock, KeyRound, Mail, ChevronLeft, Palette, RefreshCw, MousePointer2 } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../supabaseClient';
 import { BUTTON_COLOR_PRESETS } from '../constants';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface ProfileProps {
   user: User;
@@ -26,6 +27,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transactions, onLogout, onRestore, language, onLanguageChange, onClearTransactions, onResetApp, customAppName, setCustomAppName, themeColor, onThemeChange, onBack, deferredPrompt, onInstall }) => {
+  const confirm = useConfirm();
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [tempAccountInput, setTempAccountInput] = useState('');
@@ -124,11 +126,11 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
-      alert(language === 'ta' ? 'கடவுச்சொற்கள் பொருந்தவில்லை' : 'Passwords do not match');
+      confirm.showError(language === 'ta' ? 'கடவுச்சொற்கள் பொருந்தவில்லை' : 'Passwords do not match');
       return;
     }
     if (newPassword.length < 6) {
-      alert(language === 'ta' ? 'கடவுச்சொல் குறைந்தது 6 எழுத்துக்கள் இருக்க வேண்டும்' : 'Password must be at least 6 characters');
+      confirm.showError(language === 'ta' ? 'கடவுச்சொல் குறைந்தது 6 எழுத்துக்கள் இருக்க வேண்டும்' : 'Password must be at least 6 characters');
       return;
     }
     
@@ -136,15 +138,15 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
       if (isSupabaseConfigured) {
         const { error } = await supabase.auth.updateUser({ password: newPassword });
         if (error) throw error;
-        alert(language === 'ta' ? 'கடவுச்சொல் மாற்றப்பட்டது' : 'Password updated successfully');
+        confirm.showSuccess(language === 'ta' ? 'கடவுச்சொல் மாற்றப்பட்டது!' : 'Password updated successfully!');
         setShowPasswordModal(false);
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        alert("Offline mode: Cannot update password.");
+        confirm.showError("Offline mode: Cannot update password.");
       }
     } catch (error: any) {
-      alert(error.message);
+      confirm.showError(error.message);
     }
   };
 
@@ -153,18 +155,23 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(code);
     console.log(`[Viyabaari Security] Your deletion OTP is: ${code}`);
-    alert(language === 'ta' 
-      ? `பாதுகாப்பு குறியீடு (OTP) உங்கள் மின்னஞ்சலுக்கு அனுப்பப்பட்டுள்ளது (Console-ஐ பார்க்கவும்: ${code})` 
-      : `Security OTP sent to your email (Check Console: ${code})`);
+    confirm.showSuccess(language === 'ta' 
+      ? `பாதுகாப்பு குறியீடு (OTP) அனுப்பப்பட்டுள்ளது (Console: ${code})` 
+      : `Security OTP sent (Console: ${code})`);
     setDeleteStep('OTP');
   };
 
   const confirmDeleteAccount = async () => {
     if (otpInput !== generatedOtp) {
-      alert(language === 'ta' ? 'தவறான குறியீடு' : 'Invalid OTP');
+      confirm.showError(language === 'ta' ? 'தவறான குறியீடு' : 'Invalid OTP');
       return;
     }
     
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'நிச்சயமாக உங்கள் கணக்கை நிரந்தரமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to permanently delete your account?'
+    );
+    if (!isConfirmed) return;
+
     try {
       // 1. Mark account as deleted in Supabase Metadata
       if (isSupabaseConfigured) {
@@ -183,9 +190,9 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
       // 3. Clear Local Data & Sign Out
       onResetApp();
       
-      alert(language === 'ta' ? 'உங்கள் கணக்கு நீக்கப்பட்டது' : 'Your account has been deleted');
+      confirm.showSuccess(language === 'ta' ? 'உங்கள் கணக்கு நீக்கப்பட்டது' : 'Your account has been deleted');
     } catch (error: any) {
-      alert(error.message);
+      confirm.showError(error.message);
     }
   };
 
@@ -206,7 +213,7 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
         }, 100);
     } catch (e) {
         console.error("Download failed:", e);
-        alert(language === 'ta' ? 'பதிவிறக்கம் தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.' : 'Download failed. Please try again.');
+        confirm.showError(language === 'ta' ? 'பதிவிறக்கம் தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.' : 'Download failed. Please try again.');
     }
   };
 
@@ -273,7 +280,7 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
               });
           } catch (e) {
               console.error("Backup generation failed:", e);
-              alert(language === 'ta' ? 'பேக்கப் உருவாக்குவதில் பிழை ஏற்பட்டது. புகைப்படங்கள் இல்லாமல் முயற்சிக்கவும்.' : 'Error creating backup. Try disabling photos.');
+              confirm.showError(language === 'ta' ? 'பேக்கப் உருவாக்குவதில் பிழை ஏற்பட்டது. புகைப்படங்கள் இல்லாமல் முயற்சிக்கவும்.' : 'Error creating backup. Try disabling photos.');
           } finally {
               setIsBackingUp(false);
           }
@@ -304,7 +311,7 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
           const data = JSON.parse(event.target?.result as string);
           onRestore(data);
         } catch (err) {
-          alert("Error parsing backup file");
+          confirm.showError(language === 'ta' ? 'பேக்கப் ஃபைலை படிக்க முடியவில்லை' : 'Error parsing backup file');
         }
       };
       reader.readAsText(file);
@@ -458,8 +465,12 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
               : 'If new features are not visible or the app is slow, tap the button below.'}
           </p>
           <button 
-            onClick={() => {
-              if (window.confirm(language === 'ta' ? 'புதிய அப்டேட்களை சரிபார்க்க ஆப் ரீஸ்டார்ட் செய்யப்படும். தொடரவா?' : 'App will restart to check for updates. Continue?')) {
+            onClick={async () => {
+              const isConfirmed = await confirm.confirmSave(
+                language === 'ta' ? 'புதிய அப்டேட்களை சரிபார்க்க ஆப் ரீஸ்டார்ட் செய்யப்படும். தொடரவா?' : 'App will restart to check for updates. Continue?',
+                language === 'ta' ? 'ஆப் ரீஸ்டார்ட்' : 'App Restart'
+              );
+              if (isConfirmed) {
                 if ('serviceWorker' in navigator) {
                   navigator.serviceWorker.getRegistrations().then(registrations => {
                     for (let registration of registrations) {

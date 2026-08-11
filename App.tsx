@@ -17,6 +17,7 @@ import Billing from './components/Billing';
 import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabaseClient';
 import { syncToSupabase, fetchFromSupabase, getSyncQueue, clearSyncQueue, addToSyncQueue, SyncAction, deleteFromSupabase } from './lib/supabaseSync';
 import { getContrastColor } from './lib/utils';
+import { useConfirm } from './context/ConfirmContext';
 import { 
   LayoutDashboard, Package, ArrowLeftRight, User as UserIcon, PlusCircle, X, Camera, Trash2, Palette, ChevronDown, RefreshCw, Database, Loader2, WifiOff, CheckCircle2, AlertTriangle, BookOpen, Users, Sun, Moon, FileText, FileDown
 } from 'lucide-react';
@@ -127,6 +128,7 @@ const DatabaseConfigModal: React.FC<{ onClose: () => void; language: 'ta' | 'en'
 };
 
 const AddTransactionModal: React.FC<{ onSave: (txn: any, id?: string, date?: number) => void; onClose: () => void; initialData?: Transaction; language: 'ta' | 'en'; t: any; }> = ({ onSave, onClose, initialData, language, t }) => {
+  const confirm = useConfirm();
   const [type, setType] = useState<TransactionType>(initialData?.type || 'EXPENSE');
   const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
   const [category, setCategory] = useState(initialData?.category || '');
@@ -134,14 +136,22 @@ const AddTransactionModal: React.FC<{ onSave: (txn: any, id?: string, date?: num
   const [partyName, setPartyName] = useState(initialData?.partyName || '');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount)) {
-      alert(language === 'ta' ? 'சரியான எண்களை உள்ளிடவும்' : 'Please enter valid numbers');
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து சரியான தொகையை எண்களாக உள்ளிடவும்' : 'Please enter valid numbers');
       return;
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? 'இந்த பரிவர்த்தனை கணக்கை சேமிக்க விரும்புகிறீர்களா?' : 'Do you want to save this transaction?',
+      language === 'ta' ? 'பரிவர்த்தனை சேமிப்பு' : 'Confirm Save'
+    );
+    if (!isConfirmed) return;
+
     onSave({ type, amount: parsedAmount, category, description, partyName }, initialData?.id, initialData?.date);
+    confirm.showSuccess(language === 'ta' ? 'பரிவர்த்தனை வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Transaction saved successfully!');
   };
 
   return (
@@ -182,6 +192,7 @@ const AddTransactionModal: React.FC<{ onSave: (txn: any, id?: string, date?: num
 };
 
 const AddStockModal: React.FC<{ onSave: (item: any, id?: string) => void; onClose: () => void; initialData?: StockItem; language: 'ta' | 'en'; t: any; }> = ({ onSave, onClose, initialData, language, t }) => {
+  const confirm = useConfirm();
   const [name, setName] = useState(initialData?.name || '');
   const [price, setPrice] = useState(initialData?.price?.toString() || '');
   const [category, setCategory] = useState(initialData?.category || '');
@@ -243,14 +254,22 @@ const AddStockModal: React.FC<{ onSave: (item: any, id?: string) => void; onClos
 
   const currentVariant = variants[activeVariantIndex];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedPrice = parseFloat(price);
-    if (isNaN(parsedPrice)) {
-      alert(language === 'ta' ? 'சரியான எண்களை உள்ளிடவும்' : 'Please enter valid numbers');
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து சரியான விலையை எண்களாக உள்ளிடவும்' : 'Please enter valid numbers');
       return;
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? `${name} - ஸ்டாக் விவரங்களை சேமிக்க விரும்புகிறீர்களா?` : 'Do you want to save stock details?',
+      language === 'ta' ? 'ஸ்டாக் சேமிப்பு' : 'Confirm Save'
+    );
+    if (!isConfirmed) return;
+
     onSave({ name, price: parsedPrice, category, variants }, initialData?.id);
+    confirm.showSuccess(language === 'ta' ? 'ஸ்டாக் விவரங்கள் வெற்றிகரமாக சேமிக்கப்பட்டன!' : 'Stock saved successfully!');
   };
 
   return (
@@ -402,6 +421,7 @@ const AddStockModal: React.FC<{ onSave: (item: any, id?: string) => void; onClos
 const GUEST_USER: User = { uid: '', email: 'guest@viyabaari.local', name: 'Guest', isLoggedIn: false };
 
 const App: React.FC = () => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'accounts' | 'profile' | 'weavers' | 'warpers' | 'delivery-books' | 'yarns' | 'all-yarns' | 'suppliers' | 'customers' | 'billing'>('dashboard');
   const [stocks, setStocks] = useState<StockItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -906,11 +926,10 @@ const App: React.FC = () => {
   };
 
   const handleDeleteStock = async (id: string) => {
-    const confirmMsg = language === 'ta' 
-        ? 'நிச்சயமாக நீக்க வேண்டுமா?' 
-        : 'Are you sure you want to delete?';
-    
-    if (!window.confirm(confirmMsg)) return false;
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'நிச்சயமாக இந்த பொருளை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this stock item?'
+    );
+    if (!isConfirmed) return false;
     
     if (!user) return false;
     setIsLoading(true);
@@ -924,11 +943,11 @@ const App: React.FC = () => {
 
         await deleteFromSupabase(user.uid || '', 'stock_items', id, isOnline && isSupabaseConfigured);
         
-        setToast({ msg: language === 'ta' ? 'பொருள் நீக்கப்பட்டது!' : 'Item Deleted!', show: true });
+        confirm.showSuccess(language === 'ta' ? 'பொருள் வெற்றிகரமாக நீக்கப்பட்டது!' : 'Item Deleted Successfully!');
         return true;
     } catch (err) {
         console.error("Delete stock failed:", err);
-        setToast({ msg: 'Error deleting stock', show: true, isError: true });
+        confirm.showError(language === 'ta' ? 'பொருளை நீக்குவதில் பிழை ஏற்பட்டது' : 'Error deleting stock');
         return false;
     } finally {
         setIsLoading(false);
@@ -936,7 +955,11 @@ const App: React.FC = () => {
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!window.confirm(language === 'ta' ? 'நிச்சயமாக நீக்க வேண்டுமா?' : 'Are you sure you want to delete?')) return;
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'நிச்சயமாக இந்த பதிவை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this entry?'
+    );
+    if (!isConfirmed) return;
+
     if (!user) return;
     const emailKey = getEmailKey(user.email);
     try {
@@ -946,9 +969,10 @@ const App: React.FC = () => {
             return updated;
         });
         await deleteFromSupabase(user.uid || '', 'transactions', id, isOnline && isSupabaseConfigured);
-        setToast({ msg: language === 'ta' ? 'நீக்கப்பட்டது!' : 'Deleted!', show: true });
+        confirm.showSuccess(language === 'ta' ? 'பதிவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Deleted Successfully!');
     } catch (err) {
         console.error("Delete transaction failed:", err);
+        confirm.showError(language === 'ta' ? 'பதிவை நீக்குவதில் பிழை ஏற்பட்டது' : 'Error deleting transaction');
     }
   };
 

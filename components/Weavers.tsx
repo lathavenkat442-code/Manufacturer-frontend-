@@ -6,6 +6,7 @@ import { SareeAccounts } from './SareeAccounts';
 import html2pdf from 'html2pdf.js';
 import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
+import { useConfirm } from '../context/ConfirmContext';
 
 const ITEM_COLORS = [
   'bg-indigo-600',
@@ -58,6 +59,7 @@ interface WeaversProps {
 const Weavers: React.FC<WeaversProps> = ({ 
   user, language, onBack, onAddTransaction, onNavigateToStock
 }) => {
+  const confirm = useConfirm();
   const [weavers, setWeavers] = useState<Weaver[]>([]);
   const [dispatches, setDispatches] = useState<YarnDispatch[]>([]);
   const [productions, setProductions] = useState<WeaverProduction[]>([]);
@@ -172,11 +174,18 @@ const Weavers: React.FC<WeaversProps> = ({
     localStorage.setItem(`viyabaari_weaver_productions_${user.uid || 'guest'}`, JSON.stringify(newProductions));
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newName.trim()) {
-      alert(language === 'ta' ? 'பெயரை உள்ளிடவும்' : 'Please enter a name');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து தறிகாரர் பெயரை உள்ளிடவும்' : 'Please enter a weaver name');
       return;
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? `${newName.trim()} - தறிகாரர் விவரங்களை சேமிக்க விரும்புகிறீர்களா?` : 'Do you want to save weaver details?',
+      language === 'ta' ? 'தறிகாரர் பதிவு சேமிப்பு' : 'Confirm Save'
+    );
+    if (!isConfirmed) return;
+
     if (editingWeaver) {
       const updated = weavers.map(w => w.id === editingWeaver.id ? { ...w, name: newName.trim(), phone: newPhone.trim() } : w);
       saveWeavers(updated);
@@ -196,6 +205,9 @@ const Weavers: React.FC<WeaversProps> = ({
     setNewName('');
     setNewPhone('');
     setIsAdding(false);
+    confirm.showSuccess(
+      language === 'ta' ? 'தறிகாரர் விவரங்கள் வெற்றிகரமாக சேமிக்கப்பட்டன!' : 'Weaver details saved successfully!'
+    );
   };
 
   const handleEditWeaver = (weaver: Weaver) => {
@@ -205,12 +217,18 @@ const Weavers: React.FC<WeaversProps> = ({
     setIsAdding(true);
   };
 
-  const handleDeleteWeaver = (weaverId: string) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த தறிகாரரை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this weaver?')) {
+  const handleDeleteWeaver = async (weaverId: string) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'இந்த தறிகாரரை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this weaver?'
+    );
+    if (isConfirmed) {
       saveWeavers(weavers.filter(w => w.id !== weaverId));
       if (selectedWeaver?.id === weaverId) {
         setSelectedWeaver(null);
       }
+      confirm.showSuccess(
+        language === 'ta' ? 'தறிகாரர் வெற்றிகரமாக நீக்கப்பட்டார்!' : 'Weaver deleted successfully!'
+      );
     }
   };
 
@@ -323,19 +341,25 @@ const Weavers: React.FC<WeaversProps> = ({
     shareText(text);
   };
 
-  const handleAddProduction = () => {
+  const handleAddProduction = async () => {
     if (!prodDate || !prodColor || !prodWeight || !selectedWeaver) {
-      alert(language === 'ta' ? 'அனைத்து விவரங்களையும் உள்ளிடவும்' : 'Please fill all details');
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து அனைத்து அவசியமான விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
       return;
     }
     
     const weight = parseFloat(prodWeight);
     const count = prodCount ? parseInt(prodCount) : undefined;
     
-    if (isNaN(weight) || (prodCount && isNaN(count as number))) {
-      alert(language === 'ta' ? 'சரியான எண்களை உள்ளிடவும்' : 'Please enter valid numbers');
+    if (isNaN(weight) || weight <= 0 || (prodCount && isNaN(count as number))) {
+      confirm.showError(language === 'ta' ? 'தயவுசெய்து சரியான எடையை எண்களாக உள்ளிடவும்' : 'Please enter valid numbers');
       return;
     }
+
+    const isConfirmed = await confirm.confirmSave(
+      language === 'ta' ? 'உற்பத்தி விவரங்களை சேமிக்க விரும்புகிறீர்களா?' : 'Do you want to save production details?',
+      language === 'ta' ? 'உற்பத்தி சேமிப்பு' : 'Confirm Save'
+    );
+    if (!isConfirmed) return;
     
     const newProduction: WeaverProduction = {
       id: Date.now().toString(),
@@ -352,11 +376,20 @@ const Weavers: React.FC<WeaversProps> = ({
     setProdWeight('');
     setProdCount('');
     setIsAddingProduction(false);
+    confirm.showSuccess(
+      language === 'ta' ? 'உற்பத்தி விவரங்கள் வெற்றிகரமாக சேமிக்கப்பட்டன!' : 'Production details saved successfully!'
+    );
   };
 
-  const handleDeleteProduction = (id: string) => {
-    if (window.confirm(language === 'ta' ? 'நிச்சயமான நீக்க வேண்டுமா?' : 'Are you sure you want to delete?')) {
+  const handleDeleteProduction = async (id: string) => {
+    const isConfirmed = await confirm.confirmDelete(
+      language === 'ta' ? 'இந்த உற்பத்தி பதிவை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this production record?'
+    );
+    if (isConfirmed) {
       saveProductions(productions.filter(p => p.id !== id));
+      confirm.showSuccess(
+        language === 'ta' ? 'உற்பத்தி பதிவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Production record deleted successfully!'
+      );
     }
   };
 

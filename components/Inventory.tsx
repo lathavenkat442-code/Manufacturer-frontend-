@@ -4,6 +4,7 @@ import { StockItem, StockVariant } from '../types';
 import { Search, Filter, Package, AlertTriangle, Share2, X, ChevronLeft, ChevronRight, Info, History, LayoutGrid, List, Plus, MoreVertical } from 'lucide-react';
 import { TRANSLATIONS, CATEGORIES } from '../constants';
 import { useLongPress } from '../lib/hooks';
+import { useConfirm } from '../context/ConfirmContext';
 
 const getTamilHistoryDescription = (desc: string) => {
     if (desc.includes('Created')) return 'உருவாக்கப்பட்டது';
@@ -414,6 +415,7 @@ const InventoryCard: React.FC<{ item: StockItem; onClick: () => void; onShare: (
 }
 
 const Inventory: React.FC<{ stocks: StockItem[]; onAdd: () => void; onBack: () => void; language: 'ta' | 'en' }> = ({ stocks, onAdd, onBack, language }) => {
+  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -497,7 +499,7 @@ const Inventory: React.FC<{ stocks: StockItem[]; onAdd: () => void; onBack: () =
       if (navigator.share) {
         await navigator.share(shareData);
       } else {
-        alert(language === 'ta' ? 'ஷேர் செய்யும் வசதி உங்கள் மொபைலில் இல்லை.' : 'Sharing not supported on this device.');
+        confirm.showError(language === 'ta' ? 'ஷேர் செய்யும் வசதி உங்கள் சாதனத்தில் இல்லை.' : 'Sharing not supported on this device.');
       }
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -505,7 +507,7 @@ const Inventory: React.FC<{ stocks: StockItem[]; onAdd: () => void; onBack: () =
         return;
       }
       console.error('Error sharing:', err);
-      alert(language === 'ta' ? 'ஷேர் செய்ய முடியவில்லை. குறைவான படங்களை முயற்சிக்கவும்.' : 'Could not share. Try with fewer images.');
+      confirm.showError(language === 'ta' ? 'ஷேர் செய்ய முடியவில்லை. குறைவான படங்களை முயற்சிக்கவும்.' : 'Could not share. Try with fewer images.');
     }
   };
 

@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ConfirmProvider } from './context/ConfirmContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -28,6 +29,8 @@ if ('serviceWorker' in navigator) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ConfirmProvider>
+      <App />
+    </ConfirmProvider>
   </React.StrictMode>
 );
