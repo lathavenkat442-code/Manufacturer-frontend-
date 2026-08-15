@@ -2,11 +2,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { TrendingUp, TrendingDown, Eraser, Calendar, Search, ArrowUpCircle, ArrowDownCircle, XCircle, Users, ChevronRight, ChevronLeft, User, Plus, FileDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Eraser, Calendar, Search, ArrowUpCircle, ArrowDownCircle, XCircle, Users, ChevronRight, ChevronLeft, User, Plus, FileDown, Printer, Share2, FileText } from 'lucide-react';
 import { useLongPress } from '../lib/hooks';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2pdf from 'html2pdf.js';
+import { LedgerPrintModal, PartySummaryItem } from './LedgerPrintModal';
 
 interface AccountingProps {
   transactions: Transaction[];
@@ -53,6 +54,16 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
   const [viewMode, setViewMode] = useState<'LIST' | 'LEDGER'>('LIST');
   const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedParty, setSelectedParty] = useState<string | null>(null);
+
+  // Print modal state
+  const [printConfig, setPrintConfig] = useState<{
+    isOpen: boolean;
+    mode: 'PARTY' | 'ALL_TRANSACTIONS' | 'LEDGER_SUMMARY';
+    partyName?: string;
+    transactions?: Transaction[];
+    partiesSummary?: PartySummaryItem[];
+  } | null>(null);
 
   // Calculate Summary (Based on ALL transactions to show true status)
   const summary = useMemo(() => {
@@ -66,13 +77,15 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
     return transactions.filter(txn => {
         const matchesType = filterType === 'ALL' || txn.type === filterType;
         const query = searchQuery.toLowerCase();
-        const matchesSearch = txn.category.toLowerCase().includes(query) || 
+        const matchesSearch = !query || 
+                              txn.category.toLowerCase().includes(query) || 
                               txn.description?.toLowerCase().includes(query) ||
                               txn.partyName?.toLowerCase().includes(query) ||
                               txn.amount.toString().includes(query);
-        return matchesType && matchesSearch;
+        const matchesParty = !selectedParty || txn.partyName?.trim().toLowerCase() === selectedParty.trim().toLowerCase();
+        return matchesType && matchesSearch && matchesParty;
     }).sort((a, b) => b.date - a.date); // Newest first
-  }, [transactions, filterType, searchQuery]);
+  }, [transactions, filterType, searchQuery, selectedParty]);
 
   // Calculate Running Balance
   const transactionsWithBalance = useMemo(() => {
@@ -101,7 +114,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
   }, [transactionsWithBalance, language]);
 
   // Group by Party (For Ledger View)
-  const groupedByParty = useMemo(() => {
+  const groupedByParty: PartySummaryItem[] = useMemo(() => {
       // Get all unique party names
       const partyMap: Record<string, { income: number, expense: number, txns: Transaction[] }> = {};
       
@@ -123,149 +136,74 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
             income: data.income,
             expense: data.expense,
             balance: data.income - data.expense,
-            txns: data.txns
+            count: data.txns.length
         }))
         .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-        .sort((a, b) => b.txns[b.txns.length-1].date - a.txns[a.txns.length-1].date); // Sort by recent activity
+        .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)); // Sort by largest balance first
   }, [transactions, searchQuery]);
 
   const handlePartyClick = (partyName: string) => {
-      setSearchQuery(partyName);
+      setSelectedParty(partyName);
+      setSearchQuery('');
       setViewMode('LIST');
       setFilterType('ALL');
   };
 
-  const statementRef = useRef<HTMLDivElement>(null);
+  // Open Print for a specific party
+  const handlePrintPartyLedger = (partyName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const partyTxns = transactions.filter(t => t.partyName?.trim().toLowerCase() === partyName.trim().toLowerCase());
+    setPrintConfig({
+      isOpen: true,
+      mode: 'PARTY',
+      partyName,
+      transactions: partyTxns
+    });
+  };
 
-  const downloadPDF = async () => {
-    if (!statementRef.current) return;
-    
-    const element = statementRef.current;
-    const filename = `${searchQuery || 'accounts'}_statement_${new Date().toISOString().split('T')[0]}.pdf`;
-    
-    // Width for A4 at 96 DPI is ~794px. Using 800px for a clean layout.
-    const pdfWidth = 800;
+  // Open Print for all parties summary
+  const handlePrintLedgerSummary = () => {
+    setPrintConfig({
+      isOpen: true,
+      mode: 'LEDGER_SUMMARY',
+      partiesSummary: groupedByParty
+    });
+  };
 
-    const opt = {
-      margin: [10, 10, 10, 10] as [number, number, number, number],
-      filename: filename,
-      image: { type: 'jpeg' as const, quality: 0.95 },
-      html2canvas: { 
-        scale: 1.5, 
-        useCORS: true, 
-        letterRendering: true,
-        width: pdfWidth,
-        windowWidth: pdfWidth,
-        onclone: (clonedDoc: Document) => {
-          const el = clonedDoc.getElementById('pdf-statement-accounting');
-          if (el) {
-            el.style.display = 'block';
-            el.style.width = `${pdfWidth}px`;
-            el.style.padding = '30px';
-            el.style.fontFamily = 'ui-sans-serif, system-ui, -apple-system, sans-serif';
-            
-            // Aggressive font smoothing for clarity
-            el.style.setProperty('-webkit-font-smoothing', 'antialiased');
-            el.style.setProperty('text-rendering', 'optimizeLegibility');
-
-            // Find parts and restyle them for professional look
-            const header = el.querySelector('h1');
-            if (header) {
-              header.style.fontSize = '24px';
-              header.style.marginBottom = '4px';
-              header.style.color = '#000';
-              header.style.fontWeight = '900';
-            }
-
-            const grid = el.querySelector('.grid');
-            if (grid instanceof HTMLElement) {
-              grid.style.display = 'grid';
-              grid.style.gridTemplateColumns = '1fr 1fr';
-              grid.style.gap = '10px';
-              grid.style.fontSize = '14px';
-              grid.style.color = '#000';
-              grid.style.fontWeight = '700';
-              grid.style.borderTop = '2px solid #000';
-              grid.style.paddingTop = '10px';
-            }
-
-            const table = el.querySelector('table');
-            if (table) {
-              table.style.marginTop = '20px';
-              table.style.borderCollapse = 'collapse';
-              table.style.width = '1000%'; // Ensure it takes full width of container
-              table.style.width = '100%';
-              
-              const ths = table.querySelectorAll('th');
-              ths.forEach(th => {
-                th.style.backgroundColor = '#f4f4f5';
-                th.style.color = '#000';
-                th.style.border = '1px solid #d4d4d8';
-                th.style.padding = '8px';
-                th.style.fontSize = '12px';
-                th.style.fontWeight = '900';
-                th.style.textTransform = 'uppercase';
-              });
-
-              const tds = table.querySelectorAll('td');
-              tds.forEach(td => {
-                td.style.border = '1px solid #e4e4e7';
-                td.style.padding = '8px';
-                td.style.fontSize = '12px';
-                td.style.color = '#000';
-                td.style.fontWeight = '600';
-              });
-
-              // Header borders
-              const trs = table.querySelectorAll('tr');
-              trs.forEach((tr, idx) => {
-                if (idx % 2 === 0 && idx > 0) {
-                  tr.style.backgroundColor = '#fafafa';
-                }
-              });
-            }
-          }
-        }
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
-    };
-
-    try {
-      const worker = html2pdf().set(opt).from(element);
-      const blob = await worker.output('blob');
-      const file = new File([blob], filename, { type: 'application/pdf' });
-      
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: language === 'ta' ? 'கணக்கு அறிக்கை' : 'Account Statement',
-          text: filename
-        });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      html2pdf().set(opt).from(element).save();
+  // Open Print for current transaction list
+  const handlePrintCurrentList = () => {
+    if (selectedParty) {
+      handlePrintPartyLedger(selectedParty);
+    } else {
+      setPrintConfig({
+        isOpen: true,
+        mode: 'ALL_TRANSACTIONS',
+        transactions: filteredTransactions
+      });
     }
   };
 
   return (
     <div className="p-4 space-y-4 pb-28 md:pb-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="flex items-center gap-3 mb-2">
-        <button onClick={onBack} className="p-2 bg-white rounded-full shadow-sm border border-zinc-200 hover:bg-zinc-50 transition-colors">
-          <ChevronLeft size={20} className="text-zinc-600" />
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-2 bg-white rounded-full shadow-sm border border-zinc-200 hover:bg-zinc-50 transition-colors">
+            <ChevronLeft size={20} className="text-zinc-600" />
+          </button>
+          <h2 className="text-2xl font-black tamil-font text-zinc-900 tracking-tight">
+            {language === 'ta' ? 'கணக்கு & லெட்ஜர்' : 'Accounts & Ledger'}
+          </h2>
+        </div>
+
+        {/* Global Top Print Button */}
+        <button
+          onClick={viewMode === 'LEDGER' ? handlePrintLedgerSummary : handlePrintCurrentList}
+          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition active:scale-95 cursor-pointer"
+          title={language === 'ta' ? 'அறிக்கையை பிரிண்ட் செய்க' : 'Print Statement'}
+        >
+          <Printer size={16} />
+          <span>{language === 'ta' ? 'பிரிண்ட்' : 'Print'}</span>
         </button>
-        <h2 className="text-2xl font-black tamil-font text-zinc-900 tracking-tight">
-          {language === 'ta' ? 'கணக்கு' : 'Accounts'}
-        </h2>
       </div>
 
       {/* Summary Header */}
@@ -320,6 +258,41 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
           </button>
       </div>
 
+      {/* Party Filter Banner (when a party is selected in List View) */}
+      {viewMode === 'LIST' && selectedParty && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-xs">
+              {selectedParty.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                {language === 'ta' ? 'தேர்ந்தெடுக்கப்பட்ட நபர் லெட்ஜர்' : 'Selected Party Ledger'}
+              </p>
+              <p className="font-black text-zinc-900 text-base">{selectedParty}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePrintPartyLedger(selectedParty)}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+            >
+              <Printer size={15} />
+              <span>{language === 'ta' ? 'பிரிண்ட் லெட்ஜர்' : 'Print Ledger'}</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedParty(null)}
+              className="p-1.5 text-zinc-400 hover:text-zinc-700 bg-white hover:bg-zinc-100 rounded-lg transition border border-zinc-200 cursor-pointer"
+              title={language === 'ta' ? 'அனைத்தும் காட்டு' : 'Clear filter'}
+            >
+              <XCircle size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="space-y-3 sticky top-0 bg-zinc-50/95 backdrop-blur-sm z-10 py-2">
           {/* Search */}
@@ -338,38 +311,56 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
               )}
           </div>
 
-          {/* Filters (Only for List View) */}
-          {viewMode === 'LIST' && (
-            <div className="flex items-center gap-2">
-                <div className="flex-1 flex bg-zinc-200/50 p-1 rounded-xl border border-zinc-200/50">
-                    <button 
-                        onClick={() => setFilterType('ALL')}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filterType === 'ALL' ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-                    >
-                        {language === 'ta' ? 'எல்லாம்' : 'All'}
-                    </button>
-                    <button 
-                        onClick={() => setFilterType('INCOME')}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filterType === 'INCOME' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-                    >
-                        {t.income}
-                    </button>
-                    <button 
-                        onClick={() => setFilterType('EXPENSE')}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filterType === 'EXPENSE' ? 'bg-white text-rose-600 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-                    >
-                        {t.expense}
-                    </button>
+          {/* Filters & Action Bar */}
+          <div className="flex items-center gap-2">
+              {viewMode === 'LIST' ? (
+                <>
+                  <div className="flex-1 flex bg-zinc-200/50 p-1 rounded-xl border border-zinc-200/50">
+                      <button 
+                          onClick={() => setFilterType('ALL')}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filterType === 'ALL' ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                      >
+                          {language === 'ta' ? 'எல்லாம்' : 'All'}
+                      </button>
+                      <button 
+                          onClick={() => setFilterType('INCOME')}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filterType === 'INCOME' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                      >
+                          {t.income}
+                      </button>
+                      <button 
+                          onClick={() => setFilterType('EXPENSE')}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filterType === 'EXPENSE' ? 'bg-white text-rose-600 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                      >
+                          {t.expense}
+                      </button>
+                  </div>
+                  
+                  <button 
+                      onClick={handlePrintCurrentList}
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer"
+                      title={language === 'ta' ? 'அறிக்கையை பிரிண்ட் செய்க' : 'Print Statement'}
+                  >
+                      <Printer size={16} />
+                      <span className="hidden sm:inline">{language === 'ta' ? 'பிரிண்ட்' : 'Print'}</span>
+                  </button>
+                </>
+              ) : (
+                <div className="flex-1 flex justify-between items-center bg-white p-2.5 rounded-xl border border-zinc-200 shadow-xs">
+                  <div className="text-xs font-bold text-zinc-600 pl-1">
+                    {groupedByParty.length} {language === 'ta' ? 'நபர்களின் லெட்ஜர் கணக்குகள்' : 'Party Ledger Accounts'}
+                  </div>
+
+                  <button
+                    onClick={handlePrintLedgerSummary}
+                    className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                  >
+                    <Printer size={15} />
+                    <span>{language === 'ta' ? 'முழு லெட்ஜர் பிரிண்ட்' : 'Print All Ledger'}</span>
+                  </button>
                 </div>
-                <button 
-                    onClick={downloadPDF}
-                    className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors shadow-sm"
-                    title={language === 'ta' ? 'அறிக்கை டவுன்லோட்' : 'Download Statement'}
-                >
-                    <FileDown size={20} />
-                </button>
-            </div>
-          )}
+              )}
+          </div>
       </div>
 
       {/* Content */}
@@ -394,7 +385,11 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
                                     key={txn.id} 
                                     txn={txn} 
                                     language={language} 
-                                    onClick={() => {}}
+                                    onClick={() => {
+                                      if (txn.partyName) {
+                                        handlePrintPartyLedger(txn.partyName);
+                                      }
+                                    }}
                                 />
                             ))}
                         </div>
@@ -419,7 +414,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
                              </div>
                              <div>
                                  <h3 className="font-bold text-zinc-900 text-base tracking-tight">{party.name}</h3>
-                                 <p className="text-[11px] text-zinc-500 font-medium mt-0.5">{party.txns.length} {language === 'ta' ? 'பரிவர்த்தனைகள்' : 'Entries'}</p>
+                                 <p className="text-[11px] text-zinc-500 font-medium mt-0.5">{party.count} {language === 'ta' ? 'பரிவர்த்தனைகள்' : 'Entries'}</p>
                              </div>
                          </div>
                          <div className="text-right flex items-center gap-3">
@@ -431,6 +426,16 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
                                      {party.balance > 0 ? '+' : ''} ₹{party.balance.toLocaleString()}
                                  </p>
                              </div>
+
+                             {/* Dedicated Print Button on Party Card */}
+                             <button
+                               onClick={(e) => handlePrintPartyLedger(party.name, e)}
+                               className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl border border-emerald-200 transition active:scale-95 cursor-pointer shadow-xs"
+                               title={language === 'ta' ? `${party.name} லெட்ஜர் பிரிண்ட்` : `Print ${party.name} Ledger`}
+                             >
+                               <Printer size={17} />
+                             </button>
+
                              <ChevronRight size={18} className="text-zinc-300 group-hover:text-zinc-500 transition-colors" />
                          </div>
                     </div>
@@ -438,8 +443,8 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
              )}
              <p className="text-xs text-center text-zinc-400 p-4 tamil-font font-medium">
                  {language === 'ta' 
-                    ? 'பெயரை கிளிக் செய்து விவரங்களை பார்க்கலாம்.' 
-                    : 'Tap a name to see transaction history.'}
+                    ? 'பெயரை கிளிக் செய்து விவரங்களை பார்க்கலாம் அல்லது பிரிண்ட் ஐகானை அழுத்தி லெட்ஜர் சீட்டை பிரிண்ட் செய்யலாம்.' 
+                    : 'Tap a name to see transaction history or click the printer icon to print the ledger.'}
              </p>
           </div>
       )}
@@ -452,63 +457,20 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onAdd, 
         <Plus size={28} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" />
       </button>
 
-      {/* Hidden Statement for PDF Generation */}
-      <div className="hidden">
-        <div ref={statementRef} id="pdf-statement-accounting" style={{ width: '800px' }} className="p-8 bg-white text-black font-sans">
-          <div className="mb-6 border-b-4 border-black pb-4">
-            <h1 className="text-2xl font-black mb-1 uppercase tracking-tight">
-              {searchQuery ? `${searchQuery} - ${language === 'ta' ? 'கணக்கு அறிக்கை' : 'Account Statement'}` : (language === 'ta' ? 'அனைத்து கணக்கு அறிக்கை' : 'All Transactions Statement')}
-            </h1>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm font-bold">
-              <div className="flex justify-between border-b border-zinc-100 py-1">
-                <span>{language === 'ta' ? 'தேதி' : 'Date'}:</span>
-                <span>{new Date().toLocaleDateString()}</span>
-              </div>
-              <div className="flex justify-between border-b border-zinc-100 py-1">
-                <span>{language === 'ta' ? 'மீதம்' : 'Balance'}:</span>
-                <span>₹{summary.balance.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between border-b border-zinc-100 py-1">
-                <span>{language === 'ta' ? 'மொத்த வரவு' : 'Total Income'}:</span>
-                <span className="text-emerald-700">₹{summary.income.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between border-b border-zinc-100 py-1">
-                <span>{language === 'ta' ? 'மொத்த செலவு' : 'Total Expense'}:</span>
-                <span className="text-rose-700">₹{summary.expense.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          <table className="w-full text-left border-collapse border border-zinc-300">
-            <thead>
-              <tr className="bg-zinc-100 text-black uppercase text-[10px] font-black border-b-2 border-black">
-                <th className="p-2 border border-zinc-300">{language === 'ta' ? 'தேதி' : 'Date'}</th>
-                <th className="p-2 border border-zinc-300">{language === 'ta' ? 'வகை' : 'Category'}</th>
-                <th className="p-2 border border-zinc-300">{language === 'ta' ? 'பெயர்' : 'Party'}</th>
-                <th className="p-2 border border-zinc-300">{language === 'ta' ? 'குறிப்பு' : 'Description'}</th>
-                <th className="p-2 border border-zinc-300 text-right">{language === 'ta' ? 'வரவு' : 'Income'}</th>
-                <th className="p-2 border border-zinc-300 text-right">{language === 'ta' ? 'செலவு' : 'Expense'}</th>
-                <th className="p-2 border border-zinc-300 text-right">{language === 'ta' ? 'மீதம்' : 'Balance'}</th>
-              </tr>
-            </thead>
-            <tbody className="text-[11px]">
-              {transactionsWithBalance.map((txn, idx) => (
-                <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50'}>
-                  <td className="p-2 border border-zinc-200">{new Date(txn.date).toLocaleDateString()}</td>
-                  <td className="p-2 border border-zinc-200 font-bold">{txn.category}</td>
-                  <td className="p-2 border border-zinc-200">{txn.partyName || '-'}</td>
-                  <td className="p-2 border border-zinc-200 italic text-zinc-600">{txn.description || '-'}</td>
-                  <td className="p-2 border border-zinc-200 text-right text-emerald-700 font-bold">{txn.type === 'INCOME' ? `₹${txn.amount}` : '-'}</td>
-                  <td className="p-2 border border-zinc-200 text-right text-rose-700 font-bold">{txn.type === 'EXPENSE' ? `₹${txn.amount}` : '-'}</td>
-                  <td className="p-2 border border-zinc-200 text-right font-black">₹{txn.runningBalance.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Ledger Print Preview Modal */}
+      {printConfig?.isOpen && (
+        <LedgerPrintModal
+          mode={printConfig.mode}
+          partyName={printConfig.partyName}
+          transactions={printConfig.transactions}
+          partiesSummary={printConfig.partiesSummary}
+          language={language}
+          onClose={() => setPrintConfig(null)}
+        />
+      )}
     </div>
   );
 };
 
 export default Accounting;
+
