@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, DeliveryBook } from '../types';
 import { Plus, Trash2, ArrowLeft, BookOpen, Users, Box } from 'lucide-react';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 import DeliverySlipForm from './DeliverySlipForm';
 
 interface DeliveryBooksProps {
@@ -55,12 +56,14 @@ const DeliveryBooks: React.FC<DeliveryBooksProps> = ({ user, language, onBack, o
 
   const saveBooks = (newBooks: DeliveryBook[]) => {
     setCustomBooks(newBooks);
-    localStorage.setItem(`viyabaari_delivery_books_${user.uid || 'guest'}`, JSON.stringify(newBooks));
+    saveDataAndSync(user.uid, `viyabaari_delivery_books_${user.uid || 'guest'}`, newBooks, 'delivery_books');
   };
 
   const handleDeleteBook = (bookId: string) => {
     if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த புத்தகத்தை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this book?')) {
-      saveBooks(customBooks.filter(b => b.id !== bookId));
+      const updated = customBooks.filter(b => b.id !== bookId);
+      setCustomBooks(updated);
+      deleteDataAndSync(user.uid, 'delivery_books', bookId, `viyabaari_delivery_books_${user.uid || 'guest'}`, updated);
     }
   };
 

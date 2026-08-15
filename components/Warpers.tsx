@@ -6,6 +6,8 @@ import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
 import { useConfirm } from '../context/ConfirmContext';
 import { WarperStatementView } from './WarperStatementView';
+import { WarpOrderPrintModal } from './WarpOrderPrintModal';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2pdf from 'html2pdf.js';
@@ -174,13 +176,14 @@ const WarpOrderItem: React.FC<{
     language: 'ta' | 'en';
     onAssign: () => void;
     onShare: () => void;
+    onPrint?: () => void;
     onToggleStatus: () => void;
     isExpanded: boolean;
     onToggleExpand: () => void;
     onRepeat?: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
-}> = ({ order, language, onAssign, onShare, onToggleStatus, isExpanded, onToggleExpand, onRepeat, onEdit, onDelete }) => {
+}> = ({ order, language, onAssign, onShare, onPrint, onToggleStatus, isExpanded, onToggleExpand, onRepeat, onEdit, onDelete }) => {
     return (
         <div 
             onClick={onToggleExpand}
@@ -198,6 +201,15 @@ const WarpOrderItem: React.FC<{
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {onPrint && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onPrint(); }}
+                                className="p-1.5 bg-indigo-50 text-indigo-700 rounded-full hover:bg-indigo-100 transition"
+                                title={language === 'ta' ? 'பிரிண்ட்' : 'Print'}
+                            >
+                                <Printer size={14} />
+                            </button>
+                        )}
                         {onEdit && (
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onEdit(); }}
@@ -244,6 +256,15 @@ const WarpOrderItem: React.FC<{
                 </div>
 
                 <div className="flex gap-2">
+                    {onPrint && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onPrint(); }}
+                            className="flex-1 py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-indigo-100 transition"
+                        >
+                            <Printer size={14} />
+                            {language === 'ta' ? 'பிரிண்ட்' : 'Print'}
+                        </button>
+                    )}
                     <button 
                         onClick={(e) => { e.stopPropagation(); onShare(); }}
                         className="flex-1 py-3 bg-zinc-50 text-zinc-600 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-zinc-100 transition"
@@ -427,6 +448,14 @@ const Warpers: React.FC<WarpersProps> = ({
   const [orderWarpWeight, setOrderWarpWeight] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
 
+  // Weaver & Loom selection for orders
+  const [orderWeaverId, setOrderWeaverId] = useState('');
+  const [isOrderAddingNewWeaver, setIsOrderAddingNewWeaver] = useState(false);
+  const [orderNewWeaverName, setOrderNewWeaverName] = useState('');
+  const [orderLoomId, setOrderLoomId] = useState('');
+  const [isOrderAddingNewLoom, setIsOrderAddingNewLoom] = useState(false);
+  const [orderNewLoomNumber, setOrderNewLoomNumber] = useState('');
+
   const [zariBobbins, setZariBobbins] = useState('');
   const [zariEndsPerBobbin, setZariEndsPerBobbin] = useState('');
   const [zariMeters, setZariMeters] = useState('');
@@ -438,6 +467,7 @@ const Warpers: React.FC<WarpersProps> = ({
   const [topWarpLengthMeters, setTopWarpLengthMeters] = useState('');
   const [topWarpTotalYarnWeight, setTopWarpTotalYarnWeight] = useState('');
   const [topWarpSections, setTopWarpSections] = useState<WarpSection[]>([{ name: 'மேல் வார்ப்பு', ends: 0, color: '' }]);
+  const [printingOrder, setPrintingOrder] = useState<WarpOrder | null>(null);
 
   const [isAssigningOrder, setIsAssigningOrder] = useState<string | null>(null);
   const [assignWeaverId, setAssignWeaverId] = useState('');
@@ -764,42 +794,42 @@ const Warpers: React.FC<WarpersProps> = ({
 
   const saveWarpers = (newWarpers: Warper[]) => {
     setWarpers(newWarpers);
-    localStorage.setItem(`viyabaari_warpers_${user.uid || 'guest'}`, JSON.stringify(newWarpers));
+    saveDataAndSync(user.uid, `viyabaari_warpers_${user.uid || 'guest'}`, newWarpers, 'warpers');
   };
 
   const saveReturns = (newReturns: WarperReturn[]) => {
     setReturns(newReturns);
-    localStorage.setItem(`viyabaari_warper_returns_${user.uid || 'guest'}`, JSON.stringify(newReturns));
+    saveDataAndSync(user.uid, `viyabaari_warper_returns_${user.uid || 'guest'}`, newReturns, 'warper_returns');
   };
 
   const saveDispatches = (newDispatches: YarnDispatch[]) => {
     setDispatches(newDispatches);
-    localStorage.setItem(`viyabaari_yarn_dispatches_${user.uid || 'guest'}`, JSON.stringify(newDispatches));
+    saveDataAndSync(user.uid, `viyabaari_yarn_dispatches_${user.uid || 'guest'}`, newDispatches, 'yarn_dispatches');
   };
 
   const saveFormulas = (newFormulas: DenierFormula[]) => {
     setDenierFormulas(newFormulas);
-    localStorage.setItem(`viyabaari_denier_formulas_${user.uid || 'guest'}`, JSON.stringify(newFormulas));
+    saveDataAndSync(user.uid, `viyabaari_denier_formulas_${user.uid || 'guest'}`, newFormulas, 'denier_formulas');
   };
 
   const saveDesigns = (newDesigns: WarpDesign[]) => {
     setWarpDesigns(newDesigns);
-    localStorage.setItem(`viyabaari_warp_designs_${user.uid || 'guest'}`, JSON.stringify(newDesigns));
+    saveDataAndSync(user.uid, `viyabaari_warp_designs_${user.uid || 'guest'}`, newDesigns, 'warp_designs');
   };
 
   const saveWarpOrders = (newOrders: WarpOrder[]) => {
     setWarpOrders(newOrders);
-    localStorage.setItem(`viyabaari_warp_orders_${user.uid || 'guest'}`, JSON.stringify(newOrders));
+    saveDataAndSync(user.uid, `viyabaari_warp_orders_${user.uid || 'guest'}`, newOrders, 'warp_orders');
   };
 
   const saveLooms = (newLooms: Loom[]) => {
     setLooms(newLooms);
-    localStorage.setItem(`viyabaari_looms_${user.uid || 'guest'}`, JSON.stringify(newLooms));
+    saveDataAndSync(user.uid, `viyabaari_looms_${user.uid || 'guest'}`, newLooms, 'looms');
   };
 
   const saveWeavers = (newWeavers: Weaver[]) => {
     setWeavers(newWeavers);
-    localStorage.setItem(`viyabaari_weavers_${user.uid || 'guest'}`, JSON.stringify(newWeavers));
+    saveDataAndSync(user.uid, `viyabaari_weavers_${user.uid || 'guest'}`, newWeavers, 'weavers');
   };
 
   const handleAdd = async () => {
@@ -846,7 +876,9 @@ const Warpers: React.FC<WarpersProps> = ({
       language === 'ta' ? 'இந்த வார்ப்பரை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this warper?'
     );
     if (isConfirmed) {
-      saveWarpers(warpers.filter(w => w.id !== id));
+      const updated = warpers.filter(w => w.id !== id);
+      setWarpers(updated);
+      deleteDataAndSync(user.uid, 'warpers', id, `viyabaari_warpers_${user.uid || 'guest'}`, updated);
       confirm.showSuccess(language === 'ta' ? 'வார்ப்பர் வெற்றிகரமாக நீக்கப்பட்டார்!' : 'Warper deleted successfully!');
     }
   };
@@ -1013,11 +1045,19 @@ const Warpers: React.FC<WarpersProps> = ({
       language === 'ta' ? 'இந்த நூல் வரவு பதிவை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this yarn dispatch?'
     );
     if (isConfirmed) {
+      let updated;
       if (typeof idOrTxn === 'string') {
-        saveDispatches(dispatches.filter(d => d.id !== idOrTxn));
+        updated = dispatches.filter(d => d.id !== idOrTxn);
+        setDispatches(updated);
+        deleteDataAndSync(user.uid, 'yarn_dispatches', idOrTxn, `viyabaari_yarn_dispatches_${user.uid || 'guest'}`, updated);
       } else {
         const groupKey = (idOrTxn.createdAt?.toString() || idOrTxn.id).split('-')[0];
-        saveDispatches(dispatches.filter(d => (d.createdAt?.toString() || d.id).split('-')[0] !== groupKey));
+        const toDelete = dispatches.filter(d => (d.createdAt?.toString() || d.id).split('-')[0] === groupKey);
+        updated = dispatches.filter(d => (d.createdAt?.toString() || d.id).split('-')[0] !== groupKey);
+        setDispatches(updated);
+        toDelete.forEach(d => deleteDataAndSync(user.uid, 'yarn_dispatches', d.id));
+        localStorage.setItem(`viyabaari_yarn_dispatches_${user.uid || 'guest'}`, JSON.stringify(updated));
+        window.dispatchEvent(new Event('local-storage-update'));
         setSelectedTxnDetails(null);
       }
       confirm.showSuccess(language === 'ta' ? 'நூல் வரவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Yarn dispatch deleted successfully!');
@@ -1030,7 +1070,9 @@ const Warpers: React.FC<WarpersProps> = ({
     );
     if (isConfirmed) {
       const id = typeof idOrTxn === 'string' ? idOrTxn : idOrTxn.id;
-      saveReturns(returns.filter(r => r.id !== id));
+      const updated = returns.filter(r => r.id !== id);
+      setReturns(updated);
+      deleteDataAndSync(user.uid, 'warper_returns', id, `viyabaari_warper_returns_${user.uid || 'guest'}`, updated);
       if (typeof idOrTxn !== 'string') setSelectedTxnDetails(null);
       confirm.showSuccess(language === 'ta' ? 'வார்ப்பு வரவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Warp return deleted successfully!');
     }
@@ -1041,7 +1083,9 @@ const Warpers: React.FC<WarpersProps> = ({
       language === 'ta' ? 'இந்த வார்ப்பு ஆர்டரை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this warp order?'
     );
     if (isConfirmed) {
-      saveWarpOrders(warpOrders.filter(o => o.id !== id));
+      const updated = warpOrders.filter(o => o.id !== id);
+      setWarpOrders(updated);
+      deleteDataAndSync(user.uid, 'warp_orders', id, `viyabaari_warp_orders_${user.uid || 'guest'}`, updated);
       confirm.showSuccess(language === 'ta' ? 'வார்ப்பு ஆர்டர் வெற்றிகரமாக நீக்கப்பட்டது!' : 'Warp order deleted successfully!');
     }
   };
@@ -1077,8 +1121,15 @@ const Warpers: React.FC<WarpersProps> = ({
     if (order.orderType) setCreatingOrderType(order.orderType);
     setOrderDesignName(order.designName);
     setOrderNumber(order.orderNumber || '');
-    if (order.orderType === 'MAIN_WARP') {
-      setOrderWeftYarnType(order.weftYarnType);
+    setOrderWeaverId(order.weaverId === 'STOCK' ? '' : (order.weaverId || ''));
+    setIsOrderAddingNewWeaver(false);
+    setOrderNewWeaverName('');
+    setOrderLoomId((order.loomId === 'STOCK' || order.loomId === 'UNASSIGNED') ? '' : (order.loomId || ''));
+    setIsOrderAddingNewLoom(false);
+    setOrderNewLoomNumber('');
+
+    if (order.orderType === 'MAIN_WARP' || !order.orderType) {
+      setOrderWeftYarnType(order.weftYarnType || '');
       setOrderSections(order.sections);
       setOrderTotalSarees(order.totalSareesExpected.toString());
       setOrderWarpLength(order.warpLengthMeters?.toString() || '');
@@ -1089,6 +1140,7 @@ const Warpers: React.FC<WarpersProps> = ({
       setZariEndsPerBobbin(order.zariEndsPerBobbin?.toString() || '');
       setZariMeters(order.zariMeters?.toString() || '');
       setZariWeight(order.totalYarnWeight.toString());
+      setZariColor(order.zariColor || '');
     } else if (order.orderType === 'TOP_WARP') {
       setTopWarpYarnType(order.topWarpYarnType || '');
       setTopWarpLengthMeters(order.topWarpLengthMeters?.toString() || '');
@@ -1102,12 +1154,18 @@ const Warpers: React.FC<WarpersProps> = ({
     setEditingOrderId(null);
     if (order.orderType) setCreatingOrderType(order.orderType);
     setOrderDesignName(order.designName);
+    setOrderWeaverId(order.weaverId === 'STOCK' ? '' : (order.weaverId || ''));
+    setIsOrderAddingNewWeaver(false);
+    setOrderNewWeaverName('');
+    setOrderLoomId((order.loomId === 'STOCK' || order.loomId === 'UNASSIGNED') ? '' : (order.loomId || ''));
+    setIsOrderAddingNewLoom(false);
+    setOrderNewLoomNumber('');
     
     const prefix = order.orderType === 'ZARI_BOBBIN' ? 'ZB ' : (order.orderType === 'TOP_WARP' ? 'TW ' : 'ORD ');
     setOrderNumber(`${prefix}${getNextSeqNumber()}`);
     
     if (order.orderType === 'MAIN_WARP' || !order.orderType) {
-      setOrderWeftYarnType(order.weftYarnType);
+      setOrderWeftYarnType(order.weftYarnType || '');
       setOrderSections(order.sections);
       setOrderTotalSarees(order.totalSareesExpected.toString());
       setOrderWarpLength(order.warpLengthMeters?.toString() || '');
@@ -1220,10 +1278,47 @@ const Warpers: React.FC<WarpersProps> = ({
       return;
     }
 
+    let finalWeaverId = orderWeaverId;
+    let finalWeaverName = '';
+    let finalLoomId = orderLoomId;
+    let finalLoomNumber = '';
+
+    if (isOrderAddingNewWeaver && orderNewWeaverName.trim()) {
+      const newWeaver: Weaver = {
+        id: Date.now().toString() + '_weaver',
+        name: orderNewWeaverName.trim(),
+        createdAt: Date.now()
+      };
+      saveWeavers([...weavers, newWeaver]);
+      finalWeaverId = newWeaver.id;
+      finalWeaverName = newWeaver.name;
+    } else if (orderWeaverId) {
+      const w = weavers.find(v => v.id === orderWeaverId);
+      finalWeaverName = w ? w.name : '';
+    }
+
+    if (isOrderAddingNewLoom && orderNewLoomNumber.trim()) {
+      finalLoomId = (Date.now() + 1).toString() + '_loom';
+      finalLoomNumber = orderNewLoomNumber.trim();
+      if (finalWeaverId) {
+        const newLoom: Loom = {
+          id: finalLoomId,
+          weaverId: finalWeaverId,
+          loomNumber: finalLoomNumber,
+          designName: orderDesignName,
+          createdAt: Date.now()
+        };
+        saveLooms([...looms, newLoom]);
+      }
+    } else if (orderLoomId) {
+      const l = looms.find(loom => loom.id === orderLoomId);
+      finalLoomNumber = l ? l.loomNumber : '';
+    }
+
     let newOrder: WarpOrder;
     
     if (creatingOrderType === 'MAIN_WARP') {
-      if (!orderDesignName || !orderWeftYarnType || !orderTotalSarees || !orderWarpWeight || !orderWarpLength || !orderNumber) {
+      if (!orderDesignName || !orderTotalSarees || !orderWarpWeight || !orderWarpLength || !orderNumber) {
         confirm.showError(language === 'ta' ? 'தயவுசெய்து அனைத்து விவரங்களையும் நிரப்பவும்' : 'Please fill all details');
         return;
       }
@@ -1238,14 +1333,14 @@ const Warpers: React.FC<WarpersProps> = ({
       newOrder = {
         id: Date.now().toString() + '_stock_order',
         orderNumber: orderNumber,
-        loomId: 'STOCK',
-        weaverId: 'STOCK',
-        weaverName: language === 'ta' ? 'ஸ்டாக் (Stock)' : 'Stock',
-        loomNumber: '-',
+        loomId: finalLoomId || 'STOCK',
+        weaverId: finalWeaverId || 'STOCK',
+        weaverName: finalWeaverName || (language === 'ta' ? 'ஸ்டாக் (Stock)' : 'Stock'),
+        loomNumber: finalLoomNumber || '-',
         warperId: selectedWarper.id,
         designName: orderDesignName,
         warpYarnType: uniqueDeniers,
-        weftYarnType: orderWeftYarnType,
+        weftYarnType: '-',
         sections: orderSections,
         totalSareesExpected: parseInt(orderTotalSarees),
         warpLengthMeters: parseFloat(orderWarpLength),
@@ -1263,10 +1358,10 @@ const Warpers: React.FC<WarpersProps> = ({
       newOrder = {
         id: Date.now().toString() + '_stock_order',
         orderNumber: orderNumber,
-        loomId: 'STOCK',
-        weaverId: 'STOCK',
-        weaverName: language === 'ta' ? 'ஸ்டாக் (Stock)' : 'Stock',
-        loomNumber: '-',
+        loomId: finalLoomId || 'STOCK',
+        weaverId: finalWeaverId || 'STOCK',
+        weaverName: finalWeaverName || (language === 'ta' ? 'ஸ்டாக் (Stock)' : 'Stock'),
+        loomNumber: finalLoomNumber || '-',
         warperId: selectedWarper.id,
         designName: orderDesignName,
         warpYarnType: zariYarnType || '-',
@@ -1297,10 +1392,10 @@ const Warpers: React.FC<WarpersProps> = ({
       newOrder = {
         id: Date.now().toString() + '_stock_order',
         orderNumber: orderNumber,
-        loomId: 'STOCK',
-        weaverId: 'STOCK',
-        weaverName: language === 'ta' ? 'ஸ்டாக் (Stock)' : 'Stock',
-        loomNumber: '-',
+        loomId: finalLoomId || 'STOCK',
+        weaverId: finalWeaverId || 'STOCK',
+        weaverName: finalWeaverName || (language === 'ta' ? 'ஸ்டாக் (Stock)' : 'Stock'),
+        loomNumber: finalLoomNumber || '-',
         warperId: selectedWarper.id,
         designName: orderDesignName,
         warpYarnType: topWarpYarnType,
@@ -1337,6 +1432,12 @@ const Warpers: React.FC<WarpersProps> = ({
     setOrderDesignName('');
     setOrderNumber('');
     setOrderWeftYarnType('');
+    setOrderWeaverId('');
+    setIsOrderAddingNewWeaver(false);
+    setOrderNewWeaverName('');
+    setOrderLoomId('');
+    setIsOrderAddingNewLoom(false);
+    setOrderNewLoomNumber('');
     setOrderSections([{ name: 'உடல்', ends: 0, color: '' }]);
     setOrderTotalSarees('');
     setOrderWarpLength('');
@@ -1359,6 +1460,12 @@ const Warpers: React.FC<WarpersProps> = ({
     setOrderDesignName('');
     setOrderNumber('');
     setOrderWeftYarnType('');
+    setOrderWeaverId('');
+    setIsOrderAddingNewWeaver(false);
+    setOrderNewWeaverName('');
+    setOrderLoomId('');
+    setIsOrderAddingNewLoom(false);
+    setOrderNewLoomNumber('');
     setOrderSections([{ name: language === 'ta' ? 'உடல்' : 'Body', ends: 0, color: '' }]);
     setOrderTotalSarees('');
     setOrderWarpLength('');
@@ -1399,7 +1506,7 @@ const Warpers: React.FC<WarpersProps> = ({
       warperId: selectedWarper.id,
       name: orderDesignName,
       warpYarnType: creatingOrderType === 'MAIN_WARP' ? uniqueDeniers : (creatingOrderType === 'TOP_WARP' ? (topWarpYarnType || '') : (zariYarnType || '')),
-      weftYarnType: orderWeftYarnType,
+      weftYarnType: '-',
       sections: orderSections,
       totalSareesExpected: parseInt(orderTotalSarees) || 0,
       warpLengthMeters: parseFloat(orderWarpLength) || 0,
@@ -1447,9 +1554,6 @@ const Warpers: React.FC<WarpersProps> = ({
         name: newWeaverName.trim(),
         createdAt: Date.now()
       };
-      // weavers state will be updated later with saveWeavers (assuming saveWeavers exists)
-      // Wait, let me check if saveWeavers exists. I saw saveLooms.
-      // I'll check saveWeavers.
       finalWeaverId = newWeaver.id;
       finalWeaverName = newWeaver.name;
     } else {
@@ -1483,7 +1587,7 @@ const Warpers: React.FC<WarpersProps> = ({
       loomUpdates = {
         designName: orderToAssign.designName,
         warpYarnType: orderToAssign.warpYarnType,
-        weftYarnType: orderToAssign.weftYarnType,
+        weftYarnType: orderToAssign.weftYarnType || '-',
         warpType: (orderToAssign.sections.length > 3 ? 'design' : (orderToAssign.sections.length > 1 ? 'border' : 'plain')) as any,
         warpSections: orderToAssign.sections,
         totalSareesExpected: orderToAssign.totalSareesExpected,
@@ -1537,6 +1641,70 @@ const Warpers: React.FC<WarpersProps> = ({
       saveWeavers([...weavers, newWeaver]);
     }
 
+    // Sync Warper Return (ledger entry) with confirmed weaver
+    const existingReturnIndex = returns.findIndex(r => r.orderId === isAssigningOrder);
+    if (existingReturnIndex >= 0) {
+      const updatedReturns = returns.map((r, idx) => idx === existingReturnIndex ? {
+        ...r,
+        weaverId: finalWeaverId,
+        weaverName: finalWeaverName
+      } : r);
+      saveReturns(updatedReturns);
+    } else {
+      let totalEnds = 0;
+      let meters = 0;
+      let sectionsForReturn: any[] = [];
+      if (orderToAssign.orderType === 'ZARI_BOBBIN') {
+        totalEnds = (orderToAssign.zariBobbins || 0) * (orderToAssign.zariEndsPerBobbin || 0);
+        meters = orderToAssign.zariMeters || 0;
+        const denier = orderToAssign.warpYarnType || 'Zari';
+        sectionsForReturn = [{
+          name: `${denier} - Zari Bobbins`,
+          color: orderToAssign.zariColor || orderToAssign.zariYarnType || 'Zari',
+          ends: totalEnds,
+          weightKg: orderToAssign.totalYarnWeight
+        }];
+      } else if (orderToAssign.orderType === 'TOP_WARP') {
+        const topSections = orderToAssign.topWarpSections || [];
+        totalEnds = topSections.reduce((sum, sec) => sum + (sec.ends || 0), 0);
+        meters = orderToAssign.topWarpLengthMeters || 0;
+        const denier = orderToAssign.topWarpYarnType || orderToAssign.warpYarnType || 'Unknown';
+        sectionsForReturn = topSections.map(sec => ({
+          name: sec.name.startsWith(denier) ? sec.name : `${denier} - ${sec.name}`,
+          color: sec.color || 'Unknown',
+          ends: sec.ends,
+          weightKg: sec.weightKg || 0
+        }));
+      } else {
+        totalEnds = orderToAssign.sections.reduce((sum, sec) => sum + (sec.ends || 0), 0);
+        meters = orderToAssign.warpLengthMeters || 0;
+        sectionsForReturn = orderToAssign.sections.map(sec => ({
+          name: sec.name,
+          color: sec.color || 'Unknown',
+          ends: sec.ends,
+          weightKg: sec.weightKg || 0
+        }));
+      }
+
+      const newReturn: WarperReturn = {
+        id: Date.now().toString(),
+        warperId: orderToAssign.warperId,
+        date: new Date().toISOString().split('T')[0],
+        color: sectionsForReturn.map(s => s.color).filter(Boolean).join(', ') || 'Unknown',
+        weightKg: orderToAssign.totalYarnWeight,
+        yarnType: orderToAssign.warpYarnType,
+        weaverId: finalWeaverId,
+        weaverName: finalWeaverName,
+        ends: totalEnds,
+        meters: meters,
+        createdAt: Date.now(),
+        orderId: orderToAssign.id,
+        orderNumber: orderToAssign.orderNumber,
+        sections: sectionsForReturn
+      };
+      saveReturns([...returns, newReturn]);
+    }
+
     const updatedOrders = warpOrders.map(o => {
       if (o.id === isAssigningOrder) {
         return {
@@ -1561,7 +1729,7 @@ const Warpers: React.FC<WarpersProps> = ({
     setNewWeaverName('');
     setIsAddingNewLoom(false);
     setNewLoomNumber('');
-    alert(language === 'ta' ? 'வார்ப்பு வெற்றிகரமாக தறிக்காரருக்கு மாற்றப்பட்டது!' : 'Warp successfully assigned to weaver!');
+    alert(language === 'ta' ? 'வார்ப்பு வெற்றிகரமாக தறிக்காரருக்கு மாற்றப்பட்டது மற்றும் லெஜரில் வரவு வைக்கப்பட்டது!' : 'Warp successfully assigned to weaver and updated in ledger!');
   };
 
   const handleShareOrder = (order: WarpOrder) => {
@@ -3133,12 +3301,19 @@ const Warpers: React.FC<WarpersProps> = ({
                   language={language}
                   onAssign={() => {
                     setIsAssigningOrder(order.id);
-                    setAssignWeaverId(order.weaverId === 'STOCK' ? '' : (order.weaverId || ''));
-                    setAssignLoomId('');
+                    const wId = order.weaverId === 'STOCK' ? '' : (order.weaverId || '');
+                    setAssignWeaverId(wId);
+                    const lId = (order.loomId === 'STOCK' || order.loomId === 'UNASSIGNED') ? '' : (order.loomId || '');
+                    setAssignLoomId(lId);
+                    setIsAddingNewWeaver(false);
+                    setNewWeaverName('');
+                    setIsAddingNewLoom(false);
+                    setNewLoomNumber('');
                   }}
                   onToggleStatus={() => handleToggleOrderStatus(order.id)}
                   onRepeat={() => handleRepeatOrder(order)}
                   onShare={() => handleShareOrder(order)}
+                  onPrint={() => setPrintingOrder(order)}
                   onEdit={() => handleEditOrder(order)}
                   onDelete={() => handleDeleteOrder(order.id)}
                   isExpanded={expandedOrderId === order.id}
@@ -3178,12 +3353,19 @@ const Warpers: React.FC<WarpersProps> = ({
                   language={language}
                   onAssign={() => {
                     setIsAssigningOrder(order.id);
-                    setAssignWeaverId(order.weaverId === 'STOCK' ? '' : (order.weaverId || ''));
-                    setAssignLoomId('');
+                    const wId = order.weaverId === 'STOCK' ? '' : (order.weaverId || '');
+                    setAssignWeaverId(wId);
+                    const lId = (order.loomId === 'STOCK' || order.loomId === 'UNASSIGNED') ? '' : (order.loomId || '');
+                    setAssignLoomId(lId);
+                    setIsAddingNewWeaver(false);
+                    setNewWeaverName('');
+                    setIsAddingNewLoom(false);
+                    setNewLoomNumber('');
                   }}
                   onToggleStatus={() => handleToggleOrderStatus(order.id)}
                   onRepeat={() => handleRepeatOrder(order)}
                   onShare={() => handleShareOrder(order)}
+                  onPrint={() => setPrintingOrder(order)}
                   onEdit={() => handleEditOrder(order)}
                   onDelete={() => handleDeleteOrder(order.id)}
                   isExpanded={expandedOrderId === order.id}
@@ -3223,12 +3405,19 @@ const Warpers: React.FC<WarpersProps> = ({
                   language={language}
                   onAssign={() => {
                     setIsAssigningOrder(order.id);
-                    setAssignWeaverId(order.weaverId === 'STOCK' ? '' : (order.weaverId || ''));
-                    setAssignLoomId('');
+                    const wId = order.weaverId === 'STOCK' ? '' : (order.weaverId || '');
+                    setAssignWeaverId(wId);
+                    const lId = (order.loomId === 'STOCK' || order.loomId === 'UNASSIGNED') ? '' : (order.loomId || '');
+                    setAssignLoomId(lId);
+                    setIsAddingNewWeaver(false);
+                    setNewWeaverName('');
+                    setIsAddingNewLoom(false);
+                    setNewLoomNumber('');
                   }}
                   onToggleStatus={() => handleToggleOrderStatus(order.id)}
                   onRepeat={() => handleRepeatOrder(order)}
                   onShare={() => handleShareOrder(order)}
+                  onPrint={() => setPrintingOrder(order)}
                   onEdit={() => handleEditOrder(order)}
                   onDelete={() => handleDeleteOrder(order.id)}
                   isExpanded={expandedOrderId === order.id}
@@ -3337,6 +3526,14 @@ const Warpers: React.FC<WarpersProps> = ({
                               {order.status !== 'PENDING' ? <CheckCircle size={12} /> : <Clock size={12} />}
                               {order.status !== 'PENDING' ? (language === 'ta' ? 'முடிந்தது' : 'Completed') : (language === 'ta' ? 'நிலுவையில்' : 'Pending')}
                             </span>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setPrintingOrder(order); }}
+                              className="p-1.5 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition flex items-center gap-1"
+                              title={language === 'ta' ? 'பிரிண்ட்' : 'Print'}
+                            >
+                              <Printer size={12} />
+                              <span className="text-[10px] font-bold">{language === 'ta' ? 'பிரிண்ட்' : 'Print'}</span>
+                            </button>
                             {order.status === 'COMPLETED' && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleRepeatOrder(order); }}
@@ -3497,7 +3694,13 @@ const Warpers: React.FC<WarpersProps> = ({
                                     <Edit2 size={14} /> {language === 'ta' ? 'ஆர்டர் திருத்து' : 'Edit Order'}
                                   </button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div className="grid grid-cols-3 gap-2 mt-2">
+                                  <button 
+                                    onClick={() => setPrintingOrder(order)}
+                                    className="py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-sm hover:bg-indigo-100 transition flex items-center justify-center gap-2"
+                                  >
+                                    <Printer size={16} /> {language === 'ta' ? 'பிரிண்ட்' : 'Print'}
+                                  </button>
                                   <button 
                                     onClick={() => handleShareOrder(order)}
                                     className="py-2 bg-emerald-50 text-emerald-600 font-bold rounded-lg text-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
@@ -3707,13 +3910,35 @@ const Warpers: React.FC<WarpersProps> = ({
         )}
       </div>
     )}
-      {isAssigningOrder && (
+      {isAssigningOrder && (() => {
+        const orderToAssign = warpOrders.find(o => o.id === isAssigningOrder);
+        return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
-            <h3 className="font-black text-gray-800 mb-6 text-xl tamil-font">{language === 'ta' ? 'தறிக்கு மாற்று' : 'Assign to Loom'}</h3>
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <h3 className="font-black text-gray-800 mb-4 text-xl tamil-font">{language === 'ta' ? 'தறிக்கு அனுப்புதல் & உறுதிப்படுத்துதல்' : 'Confirm & Assign to Loom'}</h3>
             
+            {orderToAssign && (
+              <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-200 mb-5 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-black text-zinc-900 text-sm">{orderToAssign.designName}</span>
+                  <span className="text-xs font-black bg-zinc-200 text-zinc-800 px-2.5 py-1 rounded-lg">{orderToAssign.orderNumber || orderToAssign.id.slice(-4)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-zinc-200">
+                  <div>
+                    <span className="text-zinc-500">{language === 'ta' ? 'ஆர்டர் தறிகாரர்:' : 'Order Weaver:'} </span>
+                    <span className="font-bold text-zinc-900">{orderToAssign.weaverName || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500">{language === 'ta' ? 'ஆர்டர் தறி எண்:' : 'Order Loom No:'} </span>
+                    <span className="font-bold text-zinc-900">{orderToAssign.loomNumber || '-'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4 mb-6">
               <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-600 block">{language === 'ta' ? 'தறிக்காரரை உறுதி செய்யவும் / மாற்றவும்' : 'Confirm / Change Weaver'}</label>
                 <div className="flex gap-2">
                   <select 
                     value={isAddingNewWeaver ? 'NEW' : assignWeaverId}
@@ -3750,6 +3975,7 @@ const Warpers: React.FC<WarpersProps> = ({
               </div>
 
               <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-600 block">{language === 'ta' ? 'தறி எண்ணை உறுதி செய்யவும் / மாற்றவும்' : 'Confirm / Change Loom No'}</label>
                 <div className="flex gap-2">
                   <select 
                     value={isAddingNewLoom ? 'NEW' : assignLoomId}
@@ -3802,15 +4028,16 @@ const Warpers: React.FC<WarpersProps> = ({
               </button>
               <button 
                 onClick={handleAssignOrder} 
-                className="flex-1 py-4 bg-zinc-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-zinc-200 flex items-center justify-center gap-2"
+                className="flex-1 py-4 bg-zinc-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-zinc-200 flex items-center justify-center gap-2"
               >
                 <Check size={18} />
-                {language === 'ta' ? 'மாற்று' : 'Assign'}
+                {language === 'ta' ? 'கன்ஃபார்ம் செய்து அனுப்பு' : 'Confirm & Assign'}
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {isCreatingOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -3838,22 +4065,84 @@ const Warpers: React.FC<WarpersProps> = ({
                   className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-zinc-400 font-bold"
                 />
               </div>
+
+              {/* Weaver & Loom Details */}
+              <div className="space-y-3 bg-zinc-50/80 p-4 rounded-2xl border border-zinc-200/80">
+                <p className="text-xs font-bold text-zinc-600 mb-1">{language === 'ta' ? 'தறிக்காரர் & தறி விவரங்கள்' : 'Weaver & Loom Details'}</p>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <select 
+                      value={isOrderAddingNewWeaver ? 'NEW' : orderWeaverId}
+                      onChange={e => {
+                        if (e.target.value === 'NEW') {
+                          setIsOrderAddingNewWeaver(true);
+                          setOrderWeaverId('');
+                        } else {
+                          setIsOrderAddingNewWeaver(false);
+                          setOrderWeaverId(e.target.value);
+                        }
+                        setOrderLoomId('');
+                        setIsOrderAddingNewLoom(false);
+                      }}
+                      className="flex-1 p-3.5 bg-white border border-zinc-200 rounded-xl text-xs outline-none focus:border-zinc-500 font-bold"
+                    >
+                      <option value="">{language === 'ta' ? '-- தறிக்காரரை தேர்ந்தெடுக்கவும் --' : '-- Select Weaver --'}</option>
+                      {weavers.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                      <option value="NEW" className="text-zinc-600 font-black">+ {language === 'ta' ? 'புதிய தறிக்காரர்' : 'New Weaver'}</option>
+                    </select>
+                  </div>
+                  {isOrderAddingNewWeaver && (
+                    <input 
+                      type="text"
+                      placeholder={language === 'ta' ? 'தறிக்காரர் பெயர்' : 'Weaver Name'}
+                      value={orderNewWeaverName}
+                      onChange={e => setOrderNewWeaverName(e.target.value)}
+                      className="w-full p-3.5 bg-white border-2 border-zinc-300 rounded-xl text-xs outline-none focus:border-zinc-600 font-bold animate-in slide-in-from-top-2"
+                      autoFocus
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <select 
+                      value={isOrderAddingNewLoom ? 'NEW' : orderLoomId}
+                      onChange={e => {
+                        if (e.target.value === 'NEW') {
+                          setIsOrderAddingNewLoom(true);
+                          setOrderLoomId('');
+                        } else {
+                          setIsOrderAddingNewLoom(false);
+                          setOrderLoomId(e.target.value);
+                        }
+                      }}
+                      className="flex-1 p-3.5 bg-white border border-zinc-200 rounded-xl text-xs outline-none focus:border-zinc-500 font-bold"
+                      disabled={!orderWeaverId && !isOrderAddingNewWeaver}
+                    >
+                      <option value="">{language === 'ta' ? '-- தறியை தேர்ந்தெடுக்கவும் --' : '-- Select Loom --'}</option>
+                      {looms.filter(l => l.weaverId === orderWeaverId).map(l => (
+                        <option key={l.id} value={l.id}>{language === 'ta' ? 'தறி' : 'Loom'} {l.loomNumber} - {l.designName}</option>
+                      ))}
+                      <option value="NEW" className="text-zinc-600 font-black">+ {language === 'ta' ? 'புதிய தறி' : 'New Loom'}</option>
+                    </select>
+                  </div>
+                  {isOrderAddingNewLoom && (
+                    <input 
+                      type="text"
+                      placeholder={language === 'ta' ? 'தறி எண்/பெயர்' : 'Loom Number/Name'}
+                      value={orderNewLoomNumber}
+                      onChange={e => setOrderNewLoomNumber(e.target.value)}
+                      className="w-full p-3.5 bg-white border-2 border-zinc-300 rounded-xl text-xs outline-none focus:border-zinc-600 font-bold animate-in slide-in-from-top-2"
+                      autoFocus
+                    />
+                  )}
+                </div>
+              </div>
               
               {creatingOrderType === 'MAIN_WARP' && (
                 <>
-                  <div className="mb-4">
-                    <select 
-                      value={orderWeftYarnType}
-                      onChange={e => setOrderWeftYarnType(e.target.value)}
-                      className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-zinc-400 font-bold"
-                    >
-                      <option value="">{language === 'ta' ? 'ஊடை நூல்' : 'Weft Yarn'}</option>
-                      {YARN_TYPES.map((type, idx) => (
-                        <option key={`weft-${idx}`} value={type}>{type}</option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                     <p className="text-xs font-bold text-gray-500 mb-3">{language === 'ta' ? 'வார்ப்பு அமைப்பு' : 'Warp Structure'}</p>
                     <div className="space-y-2">
@@ -4706,7 +4995,9 @@ const Warpers: React.FC<WarpersProps> = ({
                       <button 
                         onClick={() => {
                           if (window.confirm(language === 'ta' ? 'நிச்சயமாக இந்த டிசைனை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this design?')) {
-                            saveDesigns(warpDesigns.filter(d => d.id !== design.id));
+                            const updated = warpDesigns.filter(d => d.id !== design.id);
+                            setWarpDesigns(updated);
+                            deleteDataAndSync(user.uid, 'warp_designs', design.id, `viyabaari_warp_designs_${user.uid || 'guest'}`, updated);
                             setViewingDesignId(null);
                           }
                         }}
@@ -4762,19 +5053,6 @@ const Warpers: React.FC<WarpersProps> = ({
 
               {creatingOrderType === 'MAIN_WARP' && (
                 <>
-                  <div className="mb-4">
-                    <select 
-                      value={orderWeftYarnType}
-                      onChange={e => setOrderWeftYarnType(e.target.value)}
-                      className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-zinc-400 font-bold"
-                    >
-                      <option value="">{language === 'ta' ? 'ஊடை நூல்' : 'Weft Yarn'}</option>
-                      {YARN_TYPES.map((type, idx) => (
-                        <option key={`weft-${idx}`} value={type}>{type}</option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-4">
                     <p className="text-xs font-bold text-gray-500 mb-3">{language === 'ta' ? 'வார்ப்பு அமைப்பு' : 'Warp Structure'}</p>
                     <div className="space-y-2">
@@ -5077,6 +5355,17 @@ const Warpers: React.FC<WarpersProps> = ({
       )}
 
       {transactionDetailsModal}
+
+      {printingOrder && (
+        <WarpOrderPrintModal
+          order={printingOrder}
+          warper={warpers.find(w => w.id === printingOrder.warperId) || selectedWarper}
+          dispatches={dispatches}
+          returns={returns}
+          language={language}
+          onClose={() => setPrintingOrder(null)}
+        />
+      )}
       </div>
     );
   }
@@ -5158,6 +5447,17 @@ const Warpers: React.FC<WarpersProps> = ({
         </div>
       )}
       {transactionDetailsModal}
+
+      {printingOrder && (
+        <WarpOrderPrintModal
+          order={printingOrder}
+          warper={warpers.find(w => w.id === printingOrder.warperId) || selectedWarper}
+          dispatches={dispatches}
+          returns={returns}
+          language={language}
+          onClose={() => setPrintingOrder(null)}
+        />
+      )}
 
     </div>
   );

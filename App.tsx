@@ -15,7 +15,7 @@ import Suppliers from './components/Suppliers';
 import Customers from './components/Customers';
 import Billing from './components/Billing';
 import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabaseClient';
-import { syncToSupabase, fetchFromSupabase, getSyncQueue, clearSyncQueue, addToSyncQueue, SyncAction, deleteFromSupabase } from './lib/supabaseSync';
+import { syncToSupabase, fetchFromSupabase, getSyncQueue, clearSyncQueue, addToSyncQueue, SyncAction, deleteFromSupabase, saveDataAndSync, deleteDataAndSync } from './lib/supabaseSync';
 import { getContrastColor } from './lib/utils';
 import { useConfirm } from './context/ConfirmContext';
 import { 
@@ -883,11 +883,9 @@ const App: React.FC = () => {
         const newItem = { ...itemData, id: id || Date.now().toString(), lastUpdated: Date.now() };
         
         // Immediate Optimistic Update
-        setStocks(prev => {
-          const updated = id ? prev.map(s => s.id === id ? newItem : s) : [newItem, ...prev];
-          try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated)); } catch(e) { console.warn("LocalStorage quota exceeded"); }
-          return updated;
-        });
+        const updated = id ? stocks.map(s => s.id === id ? newItem : s) : [newItem, ...stocks];
+        setStocks(updated);
+        saveDataAndSync(user.uid, `viyabaari_stocks_${emailKey}`, updated, 'stock_items');
         
         setIsAddingStock(false); 
         setEditingStock(null);
@@ -908,11 +906,9 @@ const App: React.FC = () => {
         const newTxn = { ...txnData, id: id || Date.now().toString(), date: date || Date.now() };
         
         // Immediate UI Update
-        setTransactions(prev => {
-          const updated = id ? prev.map(t => t.id === id ? newTxn : t) : [newTxn, ...prev];
-          try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(updated)); } catch(e) { console.warn("LocalStorage quota exceeded"); }
-          return updated;
-        });
+        const updated = id ? transactions.map(t => t.id === id ? newTxn : t) : [newTxn, ...transactions];
+        setTransactions(updated);
+        saveDataAndSync(user.uid, `viyabaari_txns_${emailKey}`, updated, 'transactions');
         
         setIsAddingTransaction(false); 
         setEditingTransaction(null);
@@ -935,13 +931,9 @@ const App: React.FC = () => {
     setIsLoading(true);
     const emailKey = getEmailKey(user.email);
     try {
-        setStocks(prev => {
-            const updated = prev.filter(s => s.id !== id);
-            try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated)); } catch(e) {}
-            return updated;
-        });
-
-        await deleteFromSupabase(user.uid || '', 'stock_items', id, isOnline && isSupabaseConfigured);
+        const updated = stocks.filter(s => s.id !== id);
+        setStocks(updated);
+        deleteDataAndSync(user.uid, 'stock_items', id, `viyabaari_stocks_${emailKey}`, updated);
         
         confirm.showSuccess(language === 'ta' ? 'பொருள் வெற்றிகரமாக நீக்கப்பட்டது!' : 'Item Deleted Successfully!');
         return true;
@@ -963,12 +955,9 @@ const App: React.FC = () => {
     if (!user) return;
     const emailKey = getEmailKey(user.email);
     try {
-        setTransactions(prev => {
-            const updated = prev.filter(t => t.id !== id);
-            try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(updated)); } catch(e) {}
-            return updated;
-        });
-        await deleteFromSupabase(user.uid || '', 'transactions', id, isOnline && isSupabaseConfigured);
+        const updated = transactions.filter(t => t.id !== id);
+        setTransactions(updated);
+        deleteDataAndSync(user.uid, 'transactions', id, `viyabaari_txns_${emailKey}`, updated);
         confirm.showSuccess(language === 'ta' ? 'பதிவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Deleted Successfully!');
     } catch (err) {
         console.error("Delete transaction failed:", err);

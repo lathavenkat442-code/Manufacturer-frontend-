@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, FileText, Search, Printer, CheckCircle, Clock } from 'lucide-react';
 import { User, StockItem, Invoice, InvoiceItem, Customer } from '../types';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 
 interface BillingProps {
   user: User;
@@ -50,7 +51,7 @@ export default function Billing({ user, language, stocks, onBack, onAddTransacti
 
   const saveInvoices = (newInvoices: Invoice[]) => {
     setInvoices(newInvoices);
-    localStorage.setItem(`viyabaari_invoices_${user.uid || 'guest'}`, JSON.stringify(newInvoices));
+    saveDataAndSync(user.uid, `viyabaari_invoices_${user.uid || 'guest'}`, newInvoices, 'invoices');
   };
 
   const addItem = () => {

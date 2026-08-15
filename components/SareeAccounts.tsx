@@ -5,6 +5,7 @@ import { YARN_COLORS, YARN_TYPES } from '../constants';
 import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
 import { useConfirm } from '../context/ConfirmContext';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 import html2pdf from 'html2pdf.js';
 
 // --- Transaction Row Component ---
@@ -344,17 +345,17 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
 
   const saveLooms = (newLooms: Loom[]) => {
     setLooms(newLooms);
-    localStorage.setItem(`viyabaari_looms_${user.uid || 'guest'}`, JSON.stringify(newLooms));
+    saveDataAndSync(user.uid, `viyabaari_looms_${user.uid || 'guest'}`, newLooms, 'looms');
   };
 
   const saveTransactions = (newTxns: LoomTransaction[]) => {
     setTransactions(newTxns);
-    localStorage.setItem(`viyabaari_loom_txns_${user.uid || 'guest'}`, JSON.stringify(newTxns));
+    saveDataAndSync(user.uid, `viyabaari_loom_txns_${user.uid || 'guest'}`, newTxns, 'loom_transactions');
   };
 
   const saveWarpOrders = (newOrders: WarpOrder[]) => {
     setWarpOrders(newOrders);
-    localStorage.setItem(`viyabaari_warp_orders_${user.uid || 'guest'}`, JSON.stringify(newOrders));
+    saveDataAndSync(user.uid, `viyabaari_warp_orders_${user.uid || 'guest'}`, newOrders, 'warp_orders');
   };
 
   const handleEditLoom = (loom: Loom) => {
@@ -376,8 +377,14 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
       language === 'ta' ? 'நிச்சயமாக இந்த தறியை நீக்க வேண்டுமா? இதனுடன் தொடர்புடைய அனைத்து பதிவுகளும் நீக்கப்படும்!' : 'Are you sure you want to delete this loom? All associated transactions will be deleted!'
     );
     if (isConfirmed) {
-      saveLooms(looms.filter(l => l.id !== loomId));
-      saveTransactions(transactions.filter(t => t.loomId !== loomId));
+      const updatedLooms = looms.filter(l => l.id !== loomId);
+      const txnsToDelete = transactions.filter(t => t.loomId === loomId);
+      const updatedTxns = transactions.filter(t => t.loomId !== loomId);
+      setLooms(updatedLooms);
+      setTransactions(updatedTxns);
+      deleteDataAndSync(user.uid, 'looms', loomId, `viyabaari_looms_${user.uid || 'guest'}`, updatedLooms);
+      txnsToDelete.forEach(t => deleteDataAndSync(user.uid, 'loom_transactions', t.id));
+      localStorage.setItem(`viyabaari_loom_txns_${user.uid || 'guest'}`, JSON.stringify(updatedTxns));
       confirm.showSuccess(language === 'ta' ? 'தறி வெற்றிகரமாக நீக்கப்பட்டது!' : 'Loom deleted successfully!');
     }
   };
@@ -387,7 +394,9 @@ export const SareeAccounts: React.FC<SareeAccountsProps> = ({
       language === 'ta' ? 'நிச்சயமாக இந்த பதிவை நீக்க வேண்டுமா?' : 'Are you sure you want to delete this transaction?'
     );
     if (isConfirmed) {
-      saveTransactions(transactions.filter(t => t.id !== txnId));
+      const updated = transactions.filter(t => t.id !== txnId);
+      setTransactions(updated);
+      deleteDataAndSync(user.uid, 'loom_transactions', txnId, `viyabaari_loom_txns_${user.uid || 'guest'}`, updated);
       confirm.showSuccess(language === 'ta' ? 'பதிவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Transaction deleted successfully!');
     }
   };

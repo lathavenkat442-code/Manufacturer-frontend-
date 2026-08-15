@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { User, YarnSupplier, YarnEntry } from '../types';
 import { YARN_TYPES, YARN_COLORS } from '../constants';
 import { Plus, User as UserIcon, ArrowLeft, Building2, Layers, Scissors, Calendar, FileText, Hash, Palette, Weight } from 'lucide-react';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 
 interface YarnsAccountsProps {
   user: User;
@@ -70,12 +71,12 @@ const YarnsAccounts: React.FC<YarnsAccountsProps> = ({ user, language, onBack })
 
   const saveSuppliers = (newSuppliers: YarnSupplier[]) => {
     setSuppliers(newSuppliers);
-    localStorage.setItem(`viyabaari_yarn_suppliers_${user.uid || 'guest'}`, JSON.stringify(newSuppliers));
+    saveDataAndSync(user.uid, `viyabaari_yarn_suppliers_${user.uid || 'guest'}`, newSuppliers, 'suppliers');
   };
 
   const saveEntries = (newEntries: YarnEntry[]) => {
     setEntries(newEntries);
-    localStorage.setItem(`viyabaari_yarn_entries_${user.uid || 'guest'}`, JSON.stringify(newEntries));
+    saveDataAndSync(user.uid, `viyabaari_yarn_entries_${user.uid || 'guest'}`, newEntries, 'yarn_entries');
   };
 
   const handleAdd = () => {

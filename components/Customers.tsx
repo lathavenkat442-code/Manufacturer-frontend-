@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, UserPlus, Phone, MapPin, Search, ShoppingBag, Plus, Printer, FileText, PieChart, X } from 'lucide-react';
 import { User } from '../types';
 import { useLongPress } from '../lib/hooks';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 import html2pdf from 'html2pdf.js';
 
 interface Customer {
@@ -174,12 +175,12 @@ export default function Customers({ user, language, onBack }: CustomersProps) {
 
   const saveCustomers = (newCustomers: Customer[]) => {
     setCustomers(newCustomers);
-    localStorage.setItem(`viyabaari_customers_${user.uid || 'guest'}`, JSON.stringify(newCustomers));
+    saveDataAndSync(user.uid, `viyabaari_customers_${user.uid || 'guest'}`, newCustomers, 'customers');
   };
 
   const savePurchases = (newPurchases: Purchase[]) => {
     setPurchases(newPurchases);
-    localStorage.setItem(`viyabaari_invoices_${user.uid || 'guest'}`, JSON.stringify(newPurchases));
+    saveDataAndSync(user.uid, `viyabaari_invoices_${user.uid || 'guest'}`, newPurchases, 'invoices');
   };
 
   const handleSave = () => {

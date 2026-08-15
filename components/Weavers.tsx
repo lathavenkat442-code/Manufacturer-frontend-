@@ -7,6 +7,7 @@ import html2pdf from 'html2pdf.js';
 import { shareText } from '../lib/utils';
 import { useLongPress } from '../lib/hooks';
 import { useConfirm } from '../context/ConfirmContext';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 
 const ITEM_COLORS = [
   'bg-indigo-600',
@@ -166,12 +167,12 @@ const Weavers: React.FC<WeaversProps> = ({
 
   const saveWeavers = (newWeavers: Weaver[]) => {
     setWeavers(newWeavers);
-    localStorage.setItem(`viyabaari_weavers_${user.uid || 'guest'}`, JSON.stringify(newWeavers));
+    saveDataAndSync(user.uid, `viyabaari_weavers_${user.uid || 'guest'}`, newWeavers, 'weavers');
   };
 
   const saveProductions = (newProductions: WeaverProduction[]) => {
     setProductions(newProductions);
-    localStorage.setItem(`viyabaari_weaver_productions_${user.uid || 'guest'}`, JSON.stringify(newProductions));
+    saveDataAndSync(user.uid, `viyabaari_weaver_productions_${user.uid || 'guest'}`, newProductions, 'weaver_productions');
   };
 
   const handleAdd = async () => {
@@ -222,7 +223,9 @@ const Weavers: React.FC<WeaversProps> = ({
       language === 'ta' ? 'இந்த தறிகாரரை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this weaver?'
     );
     if (isConfirmed) {
-      saveWeavers(weavers.filter(w => w.id !== weaverId));
+      const updated = weavers.filter(w => w.id !== weaverId);
+      setWeavers(updated);
+      deleteDataAndSync(user.uid, 'weavers', weaverId, `viyabaari_weavers_${user.uid || 'guest'}`, updated);
       if (selectedWeaver?.id === weaverId) {
         setSelectedWeaver(null);
       }
@@ -386,7 +389,9 @@ const Weavers: React.FC<WeaversProps> = ({
       language === 'ta' ? 'இந்த உற்பத்தி பதிவை நிச்சயமாக நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this production record?'
     );
     if (isConfirmed) {
-      saveProductions(productions.filter(p => p.id !== id));
+      const updated = productions.filter(p => p.id !== id);
+      setProductions(updated);
+      deleteDataAndSync(user.uid, 'weaver_productions', id, `viyabaari_weaver_productions_${user.uid || 'guest'}`, updated);
       confirm.showSuccess(
         language === 'ta' ? 'உற்பத்தி பதிவு வெற்றிகரமாக நீக்கப்பட்டது!' : 'Production record deleted successfully!'
       );

@@ -1,40 +1,9 @@
 import React, { useState } from 'react';
 import { Printer, Share2 } from 'lucide-react';
 import { shareText } from '../lib/utils';
+import { Warper, YarnDispatch, WarperReturn } from '../types';
 
-// Types Definition
-export interface Warper {
-  id: string;
-  name: string;
-  phone?: string;
-}
-
-export interface YarnDispatch {
-  id: string;
-  date: string;
-  recipientType: 'warper' | 'weaver' | string;
-  recipientId: string;
-  yarnType: string;
-  color: string;
-  weightKg: number;
-  billNumber?: string;
-  supplierName?: string;
-  supplierId?: string;
-}
-
-export interface WarperReturn {
-  id: string;
-  warperId: string;
-  warpNumber?: string;
-  weaverName?: string;
-  date: string;
-  yarnType: string;
-  color: string;
-  weightKg: number;
-  ends?: number;
-  length?: number;
-  orderId?: string;
-}
+export type { Warper, YarnDispatch, WarperReturn };
 
 // கலர் மற்றும் இழை விவரங்களை பிரித்தெடுக்கும் Helper Function
 export const getColorEndsBreakdown = (txn: any, order: any, language: string = 'ta') => {

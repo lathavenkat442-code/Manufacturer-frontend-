@@ -2,13 +2,17 @@ import { supabase } from '../supabaseClient';
 import { 
   StockItem, Transaction, Weaver, Warper, DeliveryBook, YarnSupplier, 
   YarnEntry, YarnDispatch, WarperReturn, DenierFormula, WeaverProduction, 
-  Loom, LoomTransaction, WarpOrder, Purchase, Customer, CustomerPurchase, Invoice, DeliverySlip, WarpDesign 
+  Loom, LoomTransaction, WarpOrder, Purchase, Customer, Invoice, DeliverySlip, WarpDesign 
 } from '../types';
 
 // Sync Queue Types
 export interface SyncAction {
   type: string;
-  payload: any;
+  payload: {
+    table: string;
+    id: string;
+    [key: string]: any;
+  };
   timestamp: number;
 }
 
@@ -19,7 +23,8 @@ const safeParse = (data: string | null) => {
 };
 
 // Sync Queue Helpers
-export const getSyncQueue = (uid: string): SyncAction[] => {
+export const getSyncQueue = (uid: string | undefined): SyncAction[] => {
+  if (!uid || uid === 'guest') return [];
   try {
     const q = localStorage.getItem(`viyabaari_sync_queue_${uid}`);
     return q ? JSON.parse(q) : [];
@@ -28,23 +33,131 @@ export const getSyncQueue = (uid: string): SyncAction[] => {
   }
 };
 
-export const addToSyncQueue = (uid: string, action: SyncAction) => {
+export const addToSyncQueue = (uid: string | undefined, action: SyncAction) => {
+  if (!uid || uid === 'guest') return;
   const q = getSyncQueue(uid);
-  q.push(action);
-  localStorage.setItem(`viyabaari_sync_queue_${uid}`, JSON.stringify(q));
+  // Avoid duplicate delete actions for the same table & id
+  if (!q.some(a => a.type === action.type && a.payload.table === action.payload.table && a.payload.id === action.payload.id)) {
+    q.push(action);
+    localStorage.setItem(`viyabaari_sync_queue_${uid}`, JSON.stringify(q));
+  }
 };
 
-export const clearSyncQueue = (uid: string) => {
+export const removeFromSyncQueue = (uid: string | undefined, table: string, id: string) => {
+  if (!uid || uid === 'guest') return;
+  const q = getSyncQueue(uid);
+  const filtered = q.filter(a => !(a.payload.table === table && a.payload.id === id));
+  localStorage.setItem(`viyabaari_sync_queue_${uid}`, JSON.stringify(filtered));
+};
+
+export const clearSyncQueue = (uid: string | undefined) => {
+  if (!uid || uid === 'guest') return;
   localStorage.removeItem(`viyabaari_sync_queue_${uid}`);
 };
 
-export const deleteFromSupabase = async (uid: string, table: string, id: string, isOnline: boolean) => {
+// Tracking Deleted IDs (so fetchFromSupabase never resurrects deleted records)
+export const getDeletedIds = (uid: string | undefined): Record<string, string[]> => {
+  if (!uid || uid === 'guest') return {};
+  try {
+    const d = localStorage.getItem(`viyabaari_deleted_ids_${uid}`);
+    return d ? JSON.parse(d) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const markIdDeleted = (uid: string | undefined, table: string, id: string) => {
   if (!uid || uid === 'guest') return;
+  const map = getDeletedIds(uid);
+  if (!map[table]) map[table] = [];
+  if (!map[table].includes(id)) {
+    map[table].push(id);
+    localStorage.setItem(`viyabaari_deleted_ids_${uid}`, JSON.stringify(map));
+  }
+};
+
+export const unmarkIdDeleted = (uid: string | undefined, table: string, id: string) => {
+  if (!uid || uid === 'guest') return;
+  const map = getDeletedIds(uid);
+  if (map[table]) {
+    map[table] = map[table].filter(item => item !== id);
+    localStorage.setItem(`viyabaari_deleted_ids_${uid}`, JSON.stringify(map));
+  }
+};
+
+export const isIdDeleted = (uid: string | undefined, table: string, id: string): boolean => {
+  if (!uid || uid === 'guest') return false;
+  const map = getDeletedIds(uid);
+  return !!map[table]?.includes(id);
+};
+
+// Debounce helper for syncing
+let syncTimer: any = null;
+export const triggerBackgroundSync = (uid: string | undefined) => {
+  if (!uid || uid === 'guest' || !navigator.onLine) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncToSupabase(uid).catch(err => console.error("Background sync error:", err));
+  }, 400);
+};
+
+// Unified Save Helper
+export const saveDataAndSync = async (uid: string | undefined, key: string, data: any, table?: string) => {
+  const userKey = uid || 'guest';
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn("LocalStorage save error:", e);
+  }
+  
+  // Dispatch local update so all components re-render immediately
+  window.dispatchEvent(new Event('local-storage-update'));
+
+  // Trigger background sync to Supabase
+  if (userKey !== 'guest') {
+    triggerBackgroundSync(userKey);
+  }
+};
+
+// Delete Helper with Cascade Handling
+export const deleteFromSupabase = async (uid: string | undefined, table: string, id: string, isOnline: boolean) => {
+  if (!uid || uid === 'guest') return true;
+
+  markIdDeleted(uid, table, id);
 
   if (isOnline) {
     try {
+      // 1. Delete child table rows first to prevent FK violation
+      if (table === 'stock_items') {
+        const { data: variants } = await supabase.from('stock_variants').select('id').eq('stock_item_id', id);
+        if (variants && variants.length > 0) {
+          const varIds = variants.map(v => v.id);
+          await supabase.from('size_stocks').delete().in('variant_id', varIds);
+          await supabase.from('stock_variants').delete().eq('stock_item_id', id);
+        }
+        await supabase.from('stock_history').delete().eq('stock_item_id', id);
+      } else if (table === 'warp_orders') {
+        await supabase.from('warp_order_sections').delete().eq('warp_order_id', id);
+      } else if (table === 'looms') {
+        await supabase.from('loom_warp_sections').delete().eq('loom_id', id);
+        await supabase.from('loom_transactions').delete().eq('loom_id', id);
+      } else if (table === 'warper_returns') {
+        await supabase.from('warper_return_sections').delete().eq('warper_return_id', id);
+      } else if (table === 'warp_designs') {
+        await supabase.from('warp_design_sections').delete().eq('warp_design_id', id);
+      } else if (table === 'purchases') {
+        await supabase.from('purchase_items').delete().eq('purchase_id', id);
+      } else if (table === 'invoices') {
+        await supabase.from('invoice_items').delete().eq('invoice_id', id);
+      } else if (table === 'delivery_slips') {
+        await supabase.from('delivery_slip_items').delete().eq('delivery_slip_id', id);
+      }
+
+      // 2. Delete main row
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
+      
+      removeFromSyncQueue(uid, table, id);
       return true;
     } catch (e) {
       console.error(`Error deleting from ${table}:`, e);
@@ -57,10 +170,36 @@ export const deleteFromSupabase = async (uid: string, table: string, id: string,
   }
 };
 
-export const syncToSupabase = async (uid: string) => {
+// Unified Delete & Sync Helper
+export const deleteDataAndSync = async (uid: string | undefined, table: string, id: string, key?: string, updatedList?: any[]) => {
+  const userKey = uid || 'guest';
+  if (key && updatedList !== undefined) {
+    try {
+      localStorage.setItem(key, JSON.stringify(updatedList));
+    } catch (e) {
+      console.warn("LocalStorage save error:", e);
+    }
+  }
+
+  // Mark as deleted immediately
+  markIdDeleted(userKey, table, id);
+
+  // Dispatch local update event
+  window.dispatchEvent(new Event('local-storage-update'));
+
+  // Delete from Supabase in background
+  if (userKey !== 'guest') {
+    deleteFromSupabase(userKey, table, id, navigator.onLine).catch(err => {
+      console.error("Delete sync error:", err);
+    });
+  }
+};
+
+// Sync local data to Supabase
+export const syncToSupabase = async (uid: string | undefined) => {
   if (!uid || uid === 'guest') return;
 
-  console.log("Starting Supabase Sync...");
+  console.log("Starting Supabase Sync for UID:", uid);
 
   try {
     // Process Sync Queue (e.g. pending deletes)
@@ -68,17 +207,18 @@ export const syncToSupabase = async (uid: string) => {
     if (queue.length > 0) {
       console.log(`Processing ${queue.length} queued actions...`);
       for (const action of queue) {
-        if (action.type === 'GENERIC_DELETE') {
-          const { table, id } = action.payload;
+        if (action.type === 'GENERIC_DELETE' || action.type === 'STOCK_DELETE' || action.type === 'TXN_DELETE') {
+          const table = action.payload.table || (action.type === 'STOCK_DELETE' ? 'stock_items' : 'transactions');
+          const id = action.payload.id;
           try {
-            await supabase.from(table).delete().eq('id', id);
+            await deleteFromSupabase(uid, table, id, true);
           } catch (e) {
             console.error(`Error processing queued delete for ${table}:`, e);
           }
         }
       }
-      clearSyncQueue(uid);
     }
+
     // 1. Profiles
     const profileStr = localStorage.getItem(`viyabaari_company_profile_${uid}`);
     if (profileStr) {
@@ -172,7 +312,6 @@ export const syncToSupabase = async (uid: string) => {
     // 8. Stock Items & Variants & Sizes
     const stocks: StockItem[] = safeParse(localStorage.getItem(`viyabaari_stocks_${uid}`));
     if (stocks.length > 0) {
-      // Upsert Stock Items
       await supabase.from('stock_items').upsert(stocks.map(stock => ({
         id: stock.id,
         user_id: uid,
@@ -182,7 +321,6 @@ export const syncToSupabase = async (uid: string) => {
         last_updated: stock.lastUpdated
       })));
 
-      // Collect variants and sizes for batch upsert
       const allVariants: any[] = [];
       const allSizes: any[] = [];
       const allHistories: any[] = [];
@@ -542,11 +680,19 @@ export const syncToSupabase = async (uid: string) => {
   }
 };
 
-export const fetchFromSupabase = async (uid: string) => {
-  if (!uid) return;
+// Fetch from Supabase while strictly honoring deleted items
+export const fetchFromSupabase = async (uid: string | undefined) => {
+  if (!uid || uid === 'guest') return;
   
-  console.log("Fetching from Supabase...");
+  console.log("Fetching from Supabase for UID:", uid);
   try {
+    const deletedMap = getDeletedIds(uid);
+    const filterOutDeleted = (items: any[] | null, table: string) => {
+      if (!items) return [];
+      const deletedList = deletedMap[table] || [];
+      return items.filter(item => !deletedList.includes(item.id));
+    };
+
     // Profiles
     const { data: profiles } = await supabase.from('company_profiles').select('*').eq('user_id', uid).maybeSingle();
     if (profiles) {
@@ -556,60 +702,67 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     // Weavers
-    const { data: weavers } = await supabase.from('weavers').select('*').eq('user_id', uid);
-    if (weavers && weavers.length > 0) {
+    const { data: rawWeavers } = await supabase.from('weavers').select('*').eq('user_id', uid);
+    if (rawWeavers) {
+      const weavers = filterOutDeleted(rawWeavers, 'weavers');
       localStorage.setItem(`viyabaari_weavers_${uid}`, JSON.stringify(weavers.map(w => ({
         id: w.id, name: w.name, phone: w.phone, createdAt: w.created_at
       }))));
     }
 
     // Warpers
-    const { data: warpers } = await supabase.from('warpers').select('*').eq('user_id', uid);
-    if (warpers && warpers.length > 0) {
+    const { data: rawWarpers } = await supabase.from('warpers').select('*').eq('user_id', uid);
+    if (rawWarpers) {
+      const warpers = filterOutDeleted(rawWarpers, 'warpers');
       localStorage.setItem(`viyabaari_warpers_${uid}`, JSON.stringify(warpers.map(w => ({
         id: w.id, name: w.name, phone: w.phone, createdAt: w.created_at
       }))));
     }
 
     // Delivery Books
-    const { data: books } = await supabase.from('delivery_books').select('*').eq('user_id', uid);
-    if (books && books.length > 0) {
+    const { data: rawBooks } = await supabase.from('delivery_books').select('*').eq('user_id', uid);
+    if (rawBooks) {
+      const books = filterOutDeleted(rawBooks, 'delivery_books');
       localStorage.setItem(`viyabaari_delivery_books_${uid}`, JSON.stringify(books.map(b => ({
         id: b.id, name: b.name, createdAt: b.created_at
       }))));
     }
 
     // Suppliers
-    const { data: suppliers } = await supabase.from('suppliers').select('*').eq('user_id', uid);
-    if (suppliers && suppliers.length > 0) {
+    const { data: rawSuppliers } = await supabase.from('suppliers').select('*').eq('user_id', uid);
+    if (rawSuppliers) {
+      const suppliers = filterOutDeleted(rawSuppliers, 'suppliers');
       localStorage.setItem(`viyabaari_suppliers_${uid}`, JSON.stringify(suppliers.map(s => ({
         id: s.id, name: s.name, companyName: s.company_name, phone: s.phone, gst: s.gst, address: s.address, createdAt: s.created_at
       }))));
     }
 
     // Customers
-    const { data: customers } = await supabase.from('customers').select('*').eq('user_id', uid);
-    if (customers && customers.length > 0) {
+    const { data: rawCustomers } = await supabase.from('customers').select('*').eq('user_id', uid);
+    if (rawCustomers) {
+      const customers = filterOutDeleted(rawCustomers, 'customers');
       localStorage.setItem(`viyabaari_customers_${uid}`, JSON.stringify(customers.map(c => ({
         id: c.id, name: c.name, phone: c.phone, address: c.address, notes: c.notes, createdAt: c.created_at
       }))));
     }
 
     // Denier Formulas
-    const { data: formulas } = await supabase.from('denier_formulas').select('*').eq('user_id', uid);
-    if (formulas && formulas.length > 0) {
+    const { data: rawFormulas } = await supabase.from('denier_formulas').select('*').eq('user_id', uid);
+    if (rawFormulas) {
+      const formulas = filterOutDeleted(rawFormulas, 'denier_formulas');
       localStorage.setItem(`viyabaari_denier_formulas_${uid}`, JSON.stringify(formulas.map(f => ({
         id: f.id, denier: f.denier, multiplier: f.multiplier
       }))));
     }
 
     // Stock Items, Variants, and Sizes
-    const { data: stocks } = await supabase.from('stock_items').select('*').eq('user_id', uid);
+    const { data: rawStocks } = await supabase.from('stock_items').select('*').eq('user_id', uid);
     const { data: variants } = await supabase.from('stock_variants').select('*').eq('user_id', uid);
     const { data: sizeStocks } = await supabase.from('size_stocks').select('*').eq('user_id', uid);
     const { data: allHistories } = await supabase.from('stock_history').select('*').eq('user_id', uid);
 
-    if (stocks && stocks.length > 0) {
+    if (rawStocks) {
+      const stocks = filterOutDeleted(rawStocks, 'stock_items');
       const reconstructedStocks = stocks.map(s => {
         const stockVariants = (variants || []).filter(v => v.stock_item_id === s.id).map(v => {
           const vSizes = (sizeStocks || []).filter(sz => sz.variant_id === v.id).map(sz => ({
@@ -647,33 +800,37 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     // Transactions
-    const { data: txns } = await supabase.from('transactions').select('*').eq('user_id', uid);
-    if (txns && txns.length > 0) {
+    const { data: rawTxns } = await supabase.from('transactions').select('*').eq('user_id', uid);
+    if (rawTxns) {
+      const txns = filterOutDeleted(rawTxns, 'transactions');
       localStorage.setItem(`viyabaari_txns_${uid}`, JSON.stringify(txns.map(t => ({
         id: t.id, type: t.type, amount: t.amount, category: t.category, partyName: t.party_name, description: t.description, date: t.date
       }))));
     }
 
     // Yarn Entries
-    const { data: yarnEntries } = await supabase.from('yarn_entries').select('*').eq('user_id', uid);
-    if (yarnEntries && yarnEntries.length > 0) {
+    const { data: rawYarnEntries } = await supabase.from('yarn_entries').select('*').eq('user_id', uid);
+    if (rawYarnEntries) {
+      const yarnEntries = filterOutDeleted(rawYarnEntries, 'yarn_entries');
       localStorage.setItem(`viyabaari_yarn_entries_${uid}`, JSON.stringify(yarnEntries.map(y => ({
         id: y.id, supplierId: y.supplier_id, yarnCategory: y.yarn_category, date: y.date, yarnType: y.yarn_type, weightKg: y.weight_kg, color: y.color, receiptNumber: y.receipt_number, createdAt: y.created_at
       }))));
     }
 
     // Yarn Dispatches
-    const { data: yarnDispatches } = await supabase.from('yarn_dispatches').select('*').eq('user_id', uid);
-    if (yarnDispatches && yarnDispatches.length > 0) {
+    const { data: rawYarnDispatches } = await supabase.from('yarn_dispatches').select('*').eq('user_id', uid);
+    if (rawYarnDispatches) {
+      const yarnDispatches = filterOutDeleted(rawYarnDispatches, 'yarn_dispatches');
       localStorage.setItem(`viyabaari_yarn_dispatches_${uid}`, JSON.stringify(yarnDispatches.map(y => ({
         id: y.id, date: y.date, recipientType: y.recipient_type, recipientId: y.recipient_id, yarnCategory: y.yarn_category, yarnType: y.yarn_type, color: y.color, weightKg: y.weight_kg, supplierId: y.supplier_id, supplierName: y.supplier_name, billNumber: y.bill_number, createdAt: y.created_at
       }))));
     }
     
     // Looms
-    const { data: looms } = await supabase.from('looms').select('*').eq('user_id', uid);
+    const { data: rawLooms } = await supabase.from('looms').select('*').eq('user_id', uid);
     const { data: loomSections } = await supabase.from('loom_warp_sections').select('*').eq('user_id', uid);
-    if (looms && looms.length > 0) {
+    if (rawLooms) {
+      const looms = filterOutDeleted(rawLooms, 'looms');
       localStorage.setItem(`viyabaari_looms_${uid}`, JSON.stringify(looms.map(l => {
         const sections = (loomSections || [])
           .filter(s => s.loom_id === l.id && s.section_type !== 'TOP')
@@ -694,17 +851,19 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     // Loom Transactions
-    const { data: loomTxns } = await supabase.from('loom_transactions').select('*').eq('user_id', uid);
-    if (loomTxns && loomTxns.length > 0) {
+    const { data: rawLoomTxns } = await supabase.from('loom_transactions').select('*').eq('user_id', uid);
+    if (rawLoomTxns) {
+      const loomTxns = filterOutDeleted(rawLoomTxns, 'loom_transactions');
       localStorage.setItem(`viyabaari_loom_txns_${uid}`, JSON.stringify(loomTxns.map(t => ({
         id: t.id, loomId: t.loom_id, date: t.date, type: t.type, sareesDelivered: t.sarees_delivered, yarnConsumed: t.yarn_consumed, wagePaid: t.wage_paid, yarnType: t.yarn_type, yarnColor: t.yarn_color, yarnGivenWeight: t.yarn_given_weight, zariKattaGiven: t.zari_katta_given, createdAt: t.created_at
       }))));
     }
 
     // Warp Orders
-    const { data: warpOrders } = await supabase.from('warp_orders').select('*').eq('user_id', uid);
+    const { data: rawWarpOrders } = await supabase.from('warp_orders').select('*').eq('user_id', uid);
     const { data: warpOrderSections } = await supabase.from('warp_order_sections').select('*').eq('user_id', uid);
-    if (warpOrders && warpOrders.length > 0) {
+    if (rawWarpOrders) {
+      const warpOrders = filterOutDeleted(rawWarpOrders, 'warp_orders');
       localStorage.setItem(`viyabaari_warp_orders_${uid}`, JSON.stringify(warpOrders.map(o => {
         const sections = (warpOrderSections || [])
           .filter(s => s.warp_order_id === o.id && s.section_type !== 'TOP')
@@ -725,9 +884,10 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     // Warper Returns
-    const { data: warperReturns } = await supabase.from('warper_returns').select('*').eq('user_id', uid);
+    const { data: rawWarperReturns } = await supabase.from('warper_returns').select('*').eq('user_id', uid);
     const { data: warperReturnSections } = await supabase.from('warper_return_sections').select('*').eq('user_id', uid);
-    if (warperReturns && warperReturns.length > 0) {
+    if (rawWarperReturns) {
+      const warperReturns = filterOutDeleted(rawWarperReturns, 'warper_returns');
       localStorage.setItem(`viyabaari_warper_returns_${uid}`, JSON.stringify(warperReturns.map(r => {
         const sections = (warperReturnSections || [])
           .filter(s => s.warper_return_id === r.id)
@@ -742,9 +902,10 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     // Purchases
-    const { data: purchases } = await supabase.from('purchases').select('*').eq('user_id', uid);
+    const { data: rawPurchases } = await supabase.from('purchases').select('*').eq('user_id', uid);
     const { data: purchaseItems } = await supabase.from('purchase_items').select('*').eq('user_id', uid);
-    if (purchases && purchases.length > 0) {
+    if (rawPurchases) {
+      const purchases = filterOutDeleted(rawPurchases, 'purchases');
       localStorage.setItem(`viyabaari_purchases_${uid}`, JSON.stringify(purchases.map(p => {
         const items = (purchaseItems || []).filter(i => i.purchase_id === p.id).map(i => ({
           type: i.type,
@@ -765,31 +926,34 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     // Invoices
-    const { data: invoices } = await supabase.from('invoices').select('*').eq('user_id', uid);
+    const { data: rawInvoices } = await supabase.from('invoices').select('*').eq('user_id', uid);
     const { data: invoiceItems } = await supabase.from('invoice_items').select('*').eq('user_id', uid);
-    if (invoices && invoices.length > 0) {
+    if (rawInvoices) {
+      const invoices = filterOutDeleted(rawInvoices, 'invoices');
       localStorage.setItem(`viyabaari_invoices_${uid}`, JSON.stringify(invoices.map(inv => {
         const items = (invoiceItems || []).filter(i => i.invoice_id === inv.id).map(i => ({
           id: i.id, stockId: i.stock_id, variantId: i.variant_id, name: i.name, description: i.description, size: i.size, quantity: i.quantity, rate: i.rate, amount: i.amount
         }));
         return {
-          id: inv.id, customerId: inv.customer_id, date: inv.date, invoiceNumber: inv.invoice_number, totalAmount: inv.total_amount, paidAmount: inv.paid_amount, status: inv.status, notes: inv.notes, createdAt: inv.created_at, items: items
+          id: inv.id, customerId: inv.customer_id, date: inv.date, invoiceNumber: inv.invoice_number, totalAmount: inv.total_amount, paidAmount: inv.paid_amount, status: inv.status, notes: inv.notes, createdAt: inv.createdAt, items: items
         };
       })));
     }
 
     // Weaver Productions
-    const { data: productions } = await supabase.from('weaver_productions').select('*').eq('user_id', uid);
-    if (productions && productions.length > 0) {
+    const { data: rawProductions } = await supabase.from('weaver_productions').select('*').eq('user_id', uid);
+    if (rawProductions) {
+      const productions = filterOutDeleted(rawProductions, 'weaver_productions');
       localStorage.setItem(`viyabaari_weaver_productions_${uid}`, JSON.stringify(productions.map(p => ({
         id: p.id, weaverId: p.weaver_id, date: p.date, color: p.color, weightKg: p.weight_kg, sareeCount: p.saree_count, createdAt: p.created_at
       }))));
     }
 
     // Delivery Slips
-    const { data: slips } = await supabase.from('delivery_slips').select('*').eq('user_id', uid);
+    const { data: rawSlips } = await supabase.from('delivery_slips').select('*').eq('user_id', uid);
     const { data: slipItems } = await supabase.from('delivery_slip_items').select('*').eq('user_id', uid);
-    if (slips && slips.length > 0) {
+    if (rawSlips) {
+      const slips = filterOutDeleted(rawSlips, 'delivery_slips');
       localStorage.setItem(`viyabaari_delivery_slips_${uid}`, JSON.stringify(slips.map(s => {
         const items = (slipItems || []).filter(i => i.delivery_slip_id === s.id).map(i => ({
           id: i.id, yarnType: i.yarn_type, color: i.color, weightKg: i.weight_kg, count: i.count, amount: i.amount, yarnCategory: i.yarn_category
@@ -801,9 +965,10 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     // Warp Designs
-    const { data: warpDesigns } = await supabase.from('warp_designs').select('*').eq('user_id', uid);
+    const { data: rawWarpDesigns } = await supabase.from('warp_designs').select('*').eq('user_id', uid);
     const { data: designSections } = await supabase.from('warp_design_sections').select('*').eq('user_id', uid);
-    if (warpDesigns && warpDesigns.length > 0) {
+    if (rawWarpDesigns) {
+      const warpDesigns = filterOutDeleted(rawWarpDesigns, 'warp_designs');
       localStorage.setItem(`viyabaari_warp_designs_${uid}`, JSON.stringify(warpDesigns.map(d => {
         const sections = (designSections || [])
           .filter(s => s.warp_design_id === d.id && s.section_type !== 'TOP')
@@ -824,6 +989,7 @@ export const fetchFromSupabase = async (uid: string) => {
     }
 
     console.log("Fetched from Supabase Successfully!");
+    window.dispatchEvent(new Event('local-storage-update'));
   } catch (error) {
     console.error("Error fetching from Supabase:", error);
   }

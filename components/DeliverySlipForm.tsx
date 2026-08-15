@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Weaver, Warper, CompanyProfile, DeliverySlip, DeliverySlipItem, YarnDispatch, YarnEntry } from '../types';
 import { ArrowLeft, Plus, Trash2, Save, Printer } from 'lucide-react';
 import { YARN_TYPES, YARN_COLORS } from '../constants';
+import { saveDataAndSync } from '../lib/supabaseSync';
 
 interface DeliverySlipFormProps {
   user: User;
@@ -60,7 +61,7 @@ const DeliverySlipForm: React.FC<DeliverySlipFormProps> = ({ user, language, typ
 
   const handleSaveProfile = () => {
     setCompanyProfile(profileForm);
-    localStorage.setItem(`viyabaari_company_profile_${user.uid || 'guest'}`, JSON.stringify(profileForm));
+    saveDataAndSync(user.uid, `viyabaari_company_profile_${user.uid || 'guest'}`, profileForm, 'company_profiles');
     setIsEditingProfile(false);
   };
 
@@ -119,7 +120,7 @@ const DeliverySlipForm: React.FC<DeliverySlipFormProps> = ({ user, language, typ
 
     const updatedSlips = [...slips, newSlip];
     setSlips(updatedSlips);
-    localStorage.setItem(`viyabaari_delivery_slips_${user.uid || 'guest'}`, JSON.stringify(updatedSlips));
+    saveDataAndSync(user.uid, `viyabaari_delivery_slips_${user.uid || 'guest'}`, updatedSlips, 'delivery_slips');
 
     // Create YarnDispatches
     const newDispatches: YarnDispatch[] = validItems.map(item => ({
@@ -136,7 +137,7 @@ const DeliverySlipForm: React.FC<DeliverySlipFormProps> = ({ user, language, typ
 
     const updatedDispatches = [...dispatches, ...newDispatches];
     setDispatches(updatedDispatches);
-    localStorage.setItem(`viyabaari_yarn_dispatches_${user.uid || 'guest'}`, JSON.stringify(updatedDispatches));
+    saveDataAndSync(user.uid, `viyabaari_yarn_dispatches_${user.uid || 'guest'}`, updatedDispatches, 'yarn_dispatches');
 
     alert(language === 'ta' ? 'டெலிவரி ஸ்லிப் சேமிக்கப்பட்டது!' : 'Delivery slip saved!');
     onBack();

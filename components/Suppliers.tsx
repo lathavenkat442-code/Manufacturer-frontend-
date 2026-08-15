@@ -3,6 +3,7 @@ import { User, Supplier, Purchase, PurchaseItem, YarnEntry } from '../types';
 import { YARN_TYPES, YARN_COLORS } from '../constants';
 import { Plus, User as UserIcon, ArrowLeft, Calendar, FileText, IndianRupee, ShoppingCart, ChevronDown, ChevronUp, X, Printer, PieChart, ShoppingBag } from 'lucide-react';
 import { useLongPress } from '../lib/hooks';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 import html2pdf from 'html2pdf.js';
 
 interface SupplierItemProps {
@@ -144,12 +145,12 @@ const Suppliers: React.FC<SuppliersProps> = ({ user, language, onBack }) => {
 
   const saveSuppliers = (newSuppliers: Supplier[]) => {
     setSuppliers(newSuppliers);
-    localStorage.setItem(`viyabaari_suppliers_${user.uid || 'guest'}`, JSON.stringify(newSuppliers));
+    saveDataAndSync(user.uid, `viyabaari_suppliers_${user.uid || 'guest'}`, newSuppliers, 'suppliers');
   };
 
   const savePurchases = (newPurchases: Purchase[]) => {
     setPurchases(newPurchases);
-    localStorage.setItem(`viyabaari_purchases_${user.uid || 'guest'}`, JSON.stringify(newPurchases));
+    saveDataAndSync(user.uid, `viyabaari_purchases_${user.uid || 'guest'}`, newPurchases, 'purchases');
   };
 
   const handleAddSupplier = () => {
@@ -251,7 +252,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ user, language, onBack }) => {
 
     if (newYarnEntries.length > 0) {
       const updatedEntries = [...currentEntries, ...newYarnEntries];
-      localStorage.setItem(`viyabaari_yarn_entries_${user.uid || 'guest'}`, JSON.stringify(updatedEntries));
+      saveDataAndSync(user.uid, `viyabaari_yarn_entries_${user.uid || 'guest'}`, updatedEntries, 'yarn_entries');
     }
 
     setPurchaseDate(new Date().toISOString().split('T')[0]);

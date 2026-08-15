@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { User, YarnSupplier, YarnEntry, YarnDispatch, Weaver, Warper } from '../types';
 import { ArrowLeft, Layers, Scissors, Plus, Calendar, FileText, Weight, Palette, Hash, Building2, Send, PieChart, Users, Sparkles, FileDown } from 'lucide-react';
 import { YARN_TYPES, YARN_COLORS } from '../constants';
+import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 import DeliverySlipForm from './DeliverySlipForm';
 import html2pdf from 'html2pdf.js';
 
@@ -77,12 +78,12 @@ const AllYarnsAccounts: React.FC<AllYarnsAccountsProps> = ({ user, language, onB
 
   const saveEntries = (newEntries: YarnEntry[]) => {
     setEntries(newEntries);
-    localStorage.setItem(`viyabaari_yarn_entries_${user.uid || 'guest'}`, JSON.stringify(newEntries));
+    saveDataAndSync(user.uid, `viyabaari_yarn_entries_${user.uid || 'guest'}`, newEntries, 'yarn_entries');
   };
 
   const saveDispatches = (newDispatches: YarnDispatch[]) => {
     setDispatches(newDispatches);
-    localStorage.setItem(`viyabaari_yarn_dispatches_${user.uid || 'guest'}`, JSON.stringify(newDispatches));
+    saveDataAndSync(user.uid, `viyabaari_yarn_dispatches_${user.uid || 'guest'}`, newDispatches, 'yarn_dispatches');
   };
 
   const handleAddEntry = () => {
