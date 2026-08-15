@@ -2884,8 +2884,29 @@ const Warpers: React.FC<WarpersProps> = ({
                 }
               };
 
+              const handlePrintStatement = () => {
+                if (!showStatementPreview) {
+                  setShowStatementPreview(true);
+                }
+                setTimeout(() => {
+                  window.print();
+                }, 100);
+              };
+
               return (
                 <div className="space-y-4">
+                  {/* பிரிண்ட் எடு பட்டன் (Print Button placed above Statement button) */}
+                  <div className="print:hidden">
+                    <button 
+                      onClick={handlePrintStatement}
+                      className="w-full py-3.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl text-sm font-black flex items-center justify-center gap-2 transition shadow-md active:scale-95 cursor-pointer border border-zinc-700 hover:shadow-xl"
+                      title={language === 'ta' ? 'அறிக்கையை பிரிண்ட் செய்க' : 'Print Statement'}
+                    >
+                      <Printer size={20} className="text-emerald-400" />
+                      <span>{language === 'ta' ? 'பிரிண்ட் எடு (Print)' : 'Print Statement'}</span>
+                    </button>
+                  </div>
+
                   <div className="flex flex-wrap gap-2 mb-4 print:hidden items-center">
                     <button 
                       onClick={() => {
