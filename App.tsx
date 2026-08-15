@@ -489,9 +489,19 @@ const App: React.FC = () => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
   // Sync activeTab with browser history to handle hardware back button
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
+      // If Exit confirmation dialog is open, pressing back closes the dialog
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        return;
+      }
+
       // If it's a subview state, the child component will handle it
       if (event.state && event.state.subview) {
         return;
@@ -507,27 +517,39 @@ const App: React.FC = () => {
       }
 
       // Handle tab navigation
+      const currentTab = activeTabRef.current;
       if (event.state && event.state.tab) {
-        setActiveTab(event.state.tab);
+        if (event.state.tab !== currentTab) {
+          setActiveTab(event.state.tab);
+        } else if (currentTab !== 'dashboard') {
+          setActiveTab('dashboard');
+        }
       } else {
-        setActiveTab('dashboard');
+        if (currentTab !== 'dashboard') {
+          setActiveTab('dashboard');
+        } else {
+          // If already at root dashboard and back is pressed -> show exit confirmation dialog!
+          setShowExitConfirm(true);
+          // Re-arm state to prevent exiting before confirming
+          window.history.pushState({ app: 'viyabaari', root: true, tab: 'dashboard' }, '');
+        }
       }
     };
 
     // Set initial state
-    if (!window.history.state) {
-      window.history.replaceState({ tab: 'dashboard' }, '');
+    if (!window.history.state || !window.history.state.app) {
+      window.history.replaceState({ app: 'viyabaari', root: true, tab: 'dashboard' }, '');
     }
     
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isAddingStock, isAddingTransaction, showDatabaseConfig, showAuthModal]);
+  }, [isAddingStock, isAddingTransaction, showDatabaseConfig, showAuthModal, showExitConfirm]);
 
   // Update history when tab changes
   const prevTab = useRef(activeTab);
   useEffect(() => {
     if (prevTab.current !== activeTab) {
-      window.history.pushState({ tab: activeTab }, '');
+      window.history.pushState({ app: 'viyabaari', tab: activeTab }, '');
       prevTab.current = activeTab;
       // Reset scroll position on tab change
       const main = document.querySelector('main');
@@ -540,7 +562,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const anyModalOpen = isAddingStock || isAddingTransaction || showDatabaseConfig || showAuthModal;
     if (anyModalOpen && !window.history.state?.modal) {
-      window.history.pushState({ modal: true, tab: activeTab }, '');
+      window.history.pushState({ app: 'viyabaari', modal: true, tab: activeTab }, '');
     }
   }, [isAddingStock, isAddingTransaction, showDatabaseConfig, showAuthModal, activeTab]);
 
@@ -1313,6 +1335,51 @@ const App: React.FC = () => {
       {showDatabaseConfig && <DatabaseConfigModal onClose={() => setShowDatabaseConfig(false)} language={language} />}
       {isAddingStock && <AddStockModal onSave={saveStock} onClose={() => setIsAddingStock(false)} initialData={editingStock || undefined} language={language} t={t} />}
       {isAddingTransaction && <AddTransactionModal onSave={saveTransaction} onClose={() => setIsAddingTransaction(false)} initialData={editingTransaction || undefined} language={language} t={t} />}
+      
+      {showExitConfirm && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 border border-zinc-100 text-center">
+            <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-inner">
+              <AlertTriangle size={32} />
+            </div>
+            
+            <h3 className="text-xl font-black text-zinc-900 tamil-font mb-2">
+              {language === 'ta' ? 'வெளியேற வேண்டுமா?' : 'Exit Application?'}
+            </h3>
+            
+            <p className="text-sm font-semibold text-zinc-600 mb-6">
+              {language === 'ta' 
+                ? 'செயலியிலிருந்து வெளியேற விரும்புகிறீர்களா?' 
+                : 'Are you sure you want to exit the application?'}
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowExitConfirm(false)}
+                className="w-full py-3.5 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-2xl font-black text-sm transition active:scale-95 cursor-pointer"
+              >
+                {language === 'ta' ? 'ரத்து' : 'Cancel'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  if (window.history.length > 2) {
+                    window.history.go(-2);
+                  } else {
+                    window.close();
+                  }
+                }}
+                className="w-full py-3.5 px-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black text-sm shadow-lg shadow-rose-600/20 transition active:scale-95 cursor-pointer"
+              >
+                {language === 'ta' ? 'வெளியேறு' : 'Exit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {isLoading && <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[110] backdrop-blur-[1px]"><div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col items-center gap-4 animate-in zoom-in duration-300"><Loader2 className="animate-spin text-zinc-600" size={40}/><p className="font-black text-gray-800 tamil-font">சேமிக்கப்படுகிறது...</p></div></div>}
       {showAuthModal && (
           <div className="fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-4 backdrop-blur-sm auth-modal">

@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { WarpOrder, Warper, YarnDispatch, WarperReturn, CompanyProfile } from '../types';
-import { Printer, Download, Share2, X, FileText } from 'lucide-react';
+import { Printer, Download, Share2, X, FileText, ArrowLeft } from 'lucide-react';
 import { shareText } from '../lib/utils';
 import html2pdf from 'html2pdf.js';
 
@@ -22,6 +22,30 @@ export const WarpOrderPrintModal: React.FC<WarpOrderPrintModalProps> = ({
   onClose
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Handle hardware / browser back button and ESC key
+  useEffect(() => {
+    // Push a state for this modal so mobile back button pops it
+    window.history.pushState({ modal: 'warp_order_print', subview: true }, '');
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
   // Load company profile from localStorage
   const savedProfile = localStorage.getItem(`viyabaari_company_profile_guest`) || 
@@ -246,17 +270,29 @@ export const WarpOrderPrintModal: React.FC<WarpOrderPrintModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 print:p-0 print:bg-white animate-in fade-in duration-200">
-      {/* Container */}
-      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh] print:max-h-none print:shadow-none print:rounded-none print:w-full">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex flex-col items-center justify-start p-2 sm:p-4 print:p-0 print:bg-white animate-in fade-in duration-200">
+      
+      {/* Main Container */}
+      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[94vh] print:max-h-none print:shadow-none print:rounded-none print:w-full border border-zinc-200">
         
-        {/* Action Header Bar (Hidden on print) */}
-        <div className="bg-zinc-900 text-white px-5 py-4 flex items-center justify-between print:hidden">
-          <div className="flex items-center gap-2">
-            <FileText size={20} className="text-zinc-300" />
-            <h3 className="font-bold text-base tracking-tight">
-              {language === 'ta' ? 'வார்ப்பு ஆர்டர் அச்சு முன்னோட்டம்' : 'Warp Order Print Preview'}
-            </h3>
+        {/* Sticky Top Header Bar (Hidden on print) */}
+        <div className="sticky top-0 z-20 bg-zinc-900 text-white px-4 sm:px-5 py-3.5 flex items-center justify-between shadow-md print:hidden">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 cursor-pointer border border-zinc-700"
+              title={language === 'ta' ? 'பின்னால் செல்ல' : 'Go Back'}
+            >
+              <ArrowLeft size={16} />
+              <span>{language === 'ta' ? 'பின்னால்' : 'Back'}</span>
+            </button>
+
+            <div className="flex items-center gap-1.5 hidden sm:flex">
+              <FileText size={18} className="text-indigo-400" />
+              <h3 className="font-bold text-sm tracking-tight text-zinc-100 truncate max-w-[200px]">
+                {language === 'ta' ? 'வார்ப்பு ஆர்டர் சீட்டு' : 'Warp Order Slip'}
+              </h3>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -265,12 +301,12 @@ export const WarpOrderPrintModal: React.FC<WarpOrderPrintModalProps> = ({
               className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow transition active:scale-95 cursor-pointer"
             >
               <Printer size={15} />
-              <span>{language === 'ta' ? 'பிரிண்ட்' : 'Print'}</span>
+              <span className="hidden sm:inline">{language === 'ta' ? 'பிரிண்ட்' : 'Print'}</span>
             </button>
 
             <button
               onClick={handleDownloadPDF}
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow transition active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow transition active:scale-95 cursor-pointer"
             >
               <Download size={15} />
               <span>{language === 'ta' ? 'PDF' : 'PDF'}</span>
@@ -278,15 +314,16 @@ export const WarpOrderPrintModal: React.FC<WarpOrderPrintModalProps> = ({
 
             <button
               onClick={handleShare}
-              className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 cursor-pointer border border-zinc-700"
             >
               <Share2 size={15} />
-              <span>{language === 'ta' ? 'பகிர்' : 'Share'}</span>
+              <span className="hidden sm:inline">{language === 'ta' ? 'பகிர்' : 'Share'}</span>
             </button>
 
             <button
               onClick={onClose}
-              className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition ml-2 cursor-pointer"
+              className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition ml-1 cursor-pointer"
+              title={language === 'ta' ? 'மூடு' : 'Close'}
             >
               <X size={20} />
             </button>
@@ -294,11 +331,11 @@ export const WarpOrderPrintModal: React.FC<WarpOrderPrintModalProps> = ({
         </div>
 
         {/* Scrollable Printable Document Area */}
-        <div className="overflow-y-auto p-4 sm:p-8 custom-scrollbar print:p-0 print:overflow-visible">
+        <div className="overflow-y-auto p-4 sm:p-6 custom-scrollbar print:p-0 print:overflow-visible flex-1">
           <div 
             ref={printRef} 
             id="warp-order-print-document"
-            className="bg-white border border-zinc-200 p-6 sm:p-8 rounded-2xl print:border-none print:p-2 text-zinc-900 text-xs sm:text-sm font-sans"
+            className="bg-white border border-zinc-200 p-5 sm:p-7 rounded-2xl print:border-none print:p-2 text-zinc-900 text-xs sm:text-sm font-sans"
           >
             {/* 1. Header (கடையின் பெயர் நடுவில், GST இடது, Phone வலது) */}
             <div className="border-b-2 border-zinc-900 pb-4 mb-4">
@@ -545,6 +582,44 @@ export const WarpOrderPrintModal: React.FC<WarpOrderPrintModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Sticky Bottom Action & Back Bar (Always accessible even after scrolling to bottom) */}
+        <div className="sticky bottom-0 z-20 bg-zinc-100 border-t border-zinc-200 px-4 py-3 flex items-center justify-between gap-2 print:hidden shadow-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-900 text-white px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm shadow transition active:scale-95 cursor-pointer"
+          >
+            <ArrowLeft size={16} />
+            <span>{language === 'ta' ? 'பின்னால் செல்ல' : 'Back / Close'}</span>
+          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm shadow transition active:scale-95 cursor-pointer"
+            >
+              <Printer size={16} />
+              <span>{language === 'ta' ? 'பிரிண்ட்' : 'Print'}</span>
+            </button>
+
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm shadow transition active:scale-95 cursor-pointer"
+            >
+              <Download size={16} />
+              <span>{language === 'ta' ? 'PDF' : 'PDF'}</span>
+            </button>
+
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 px-3.5 py-2.5 rounded-xl font-black text-xs sm:text-sm transition active:scale-95 cursor-pointer"
+            >
+              <Share2 size={16} />
+              <span>{language === 'ta' ? 'பகிர்' : 'Share'}</span>
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );

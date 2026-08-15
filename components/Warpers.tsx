@@ -602,7 +602,8 @@ const Warpers: React.FC<WarpersProps> = ({
       isPopping.current = true;
       
       // Order of precedence for closing sub-views
-      if (isAdding) { setIsAdding(false); }
+      if (printingOrder) { setPrintingOrder(null); }
+      else if (isAdding) { setIsAdding(false); }
       else if (isAddingReturn) { setIsAddingReturn(false); }
       else if (isAddingDispatch) { setIsAddingDispatch(false); }
       else if (isManagingFormulas) { setIsManagingFormulas(false); }
@@ -612,6 +613,7 @@ const Warpers: React.FC<WarpersProps> = ({
       else if (isAssigningOrder) { setIsAssigningOrder(null); }
       else if (viewStatement) { setViewStatement(null); }
       else if (selectedTxnDetails) { setSelectedTxnDetails(null); }
+      else if (expandedOrderId) { setExpandedOrderId(null); }
       else if (selectedWarper) { 
         if (viewType !== 'overview') {
           setViewType('overview');
@@ -626,7 +628,7 @@ const Warpers: React.FC<WarpersProps> = ({
       }, 100);
     };
 
-    const anySubViewOpen = isAdding || isAddingReturn || isAddingDispatch || isManagingFormulas || isCreatingOrder || isCreatingDesign || viewingDesignId || isAssigningOrder || viewStatement || selectedWarper || selectedTxnDetails;
+    const anySubViewOpen = printingOrder || isAdding || isAddingReturn || isAddingDispatch || isManagingFormulas || isCreatingOrder || isCreatingDesign || viewingDesignId || isAssigningOrder || viewStatement || selectedWarper || selectedTxnDetails || expandedOrderId;
     
     // Only push if we are entering a subview state and don't already have one
     if (anySubViewOpen && !window.history.state?.subview && !isPopping.current) {
@@ -635,7 +637,7 @@ const Warpers: React.FC<WarpersProps> = ({
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isAdding, isAddingReturn, isAddingDispatch, isManagingFormulas, isCreatingOrder, isCreatingDesign, viewingDesignId, isAssigningOrder, viewStatement, selectedWarper, selectedTxnDetails, viewType]);
+  }, [printingOrder, isAdding, isAddingReturn, isAddingDispatch, isManagingFormulas, isCreatingOrder, isCreatingDesign, viewingDesignId, isAssigningOrder, viewStatement, selectedWarper, selectedTxnDetails, expandedOrderId, viewType]);
 
   useEffect(() => {
     setCurrentPage(1);
