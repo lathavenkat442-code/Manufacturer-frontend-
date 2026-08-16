@@ -2375,12 +2375,21 @@ const Warpers: React.FC<WarpersProps> = ({
             </button>
           )}
           {viewType !== 'overview' && (
-            <button 
-              onClick={() => setViewStatement(selectedWarper.id)}
-              className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full hover:bg-blue-100 flex items-center gap-1 print:hidden"
-            >
-              <FileText size={14} /> {language === 'ta' ? 'அறிக்கை' : 'Statement'}
-            </button>
+            <div className="flex items-center gap-1.5 print:hidden">
+              <button 
+                onClick={() => setPrintingWarperLedger(selectedWarper)}
+                className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full hover:bg-emerald-100 flex items-center gap-1 transition active:scale-95 cursor-pointer shadow-sm"
+                title={language === 'ta' ? 'அறிக்கையை பிரிண்ட் செய்க' : 'Print Statement'}
+              >
+                <Printer size={14} /> {language === 'ta' ? 'பிரிண்ட்' : 'Print'}
+              </button>
+              <button 
+                onClick={() => setViewStatement(selectedWarper.id)}
+                className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full hover:bg-blue-100 flex items-center gap-1 transition active:scale-95 cursor-pointer"
+              >
+                <FileText size={14} /> {language === 'ta' ? 'அறிக்கை' : 'Statement'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -5385,6 +5394,20 @@ const Warpers: React.FC<WarpersProps> = ({
           returns={returns}
           language={language}
           onClose={() => setPrintingOrder(null)}
+        />
+      )}
+
+      {printingWarperLedger && (
+        <WarperLedgerPrintModal
+          warper={printingWarperLedger}
+          dispatches={dispatches}
+          returns={returns}
+          selectedDeniers={selectedDeniers}
+          initialStartDate={startDate}
+          initialEndDate={endDate}
+          language={language}
+          onClose={() => setPrintingWarperLedger(null)}
+          autoPrint={true}
         />
       )}
       </div>
