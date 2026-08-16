@@ -457,56 +457,56 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
             </div>
 
             {/* Right Corner */}
-            <div className="text-right max-w-[45%]">
-              <div className="inline-block text-left bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 print:border-black">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[10px] font-black uppercase text-zinc-600 tracking-wider">
-                    {language === 'ta' ? 'வார்ப்புகாரர்:' : 'Warper:'}
-                  </span>
-                  <span className="text-sm sm:text-base font-black text-black uppercase">
-                    {warper.name}
-                  </span>
-                </div>
-
-                {warper.phone && (
-                  <div className="flex items-baseline justify-between gap-3 mt-0.5">
-                    <span className="text-[10px] font-black uppercase text-zinc-600">
-                      {language === 'ta' ? 'போன்:' : 'Phone:'}
-                    </span>
-                    <span className="text-xs font-black text-zinc-800">
-                      {warper.phone}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-baseline justify-between gap-3 mt-0.5">
-                  <span className="text-[10px] font-black uppercase text-zinc-600">
-                    {language === 'ta' ? 'தேதி:' : 'Date:'}
-                  </span>
-                  <span className="text-xs font-black text-black">
-                    {formattedDate}
-                  </span>
-                </div>
-
-                {(startDate || endDate) && (
-                  <div className="flex items-baseline justify-between gap-3 mt-0.5">
-                    <span className="text-[10px] font-black uppercase text-zinc-600">
-                      {language === 'ta' ? 'காலம்:' : 'Period:'}
-                    </span>
-                    <span className="text-[11px] font-bold text-zinc-800">
-                      {startDate ? new Date(startDate).toLocaleDateString('ta-IN') : '—'} முதல் {endDate ? new Date(endDate).toLocaleDateString('ta-IN') : '—'}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-baseline justify-between gap-3 mt-0.5 border-t border-zinc-200 pt-0.5">
-                  <span className="text-[10px] font-black uppercase text-zinc-600">
-                    {language === 'ta' ? 'டீனியர்:' : 'Denier:'}
-                  </span>
-                  <span className="text-[11px] font-black text-black">
-                    {isAll ? (language === 'ta' ? 'அனைத்து டீனியர்கள்' : 'All Deniers') : currentDeniers.join(', ')}
-                  </span>
-                </div>
+            <div className="text-right min-w-[240px] max-w-[45%]">
+              <div className="border border-black rounded-lg p-2.5 bg-zinc-50 print:bg-white text-left">
+                <table className="w-full text-xs font-bold text-black border-collapse">
+                  <tbody>
+                    <tr>
+                      <td className="text-[10px] font-black text-zinc-700 uppercase py-0.5 pr-2 whitespace-nowrap align-top">
+                        {language === 'ta' ? 'வார்ப்புகாரர்:' : 'Warper:'}
+                      </td>
+                      <td className="text-sm font-black text-black text-right uppercase py-0.5">
+                        {warper.name}
+                      </td>
+                    </tr>
+                    {warper.phone && (
+                      <tr>
+                        <td className="text-[10px] font-bold text-zinc-600 uppercase py-0.5 pr-2 whitespace-nowrap align-top">
+                          {language === 'ta' ? 'போன்:' : 'Phone:'}
+                        </td>
+                        <td className="text-xs font-bold text-black text-right py-0.5">
+                          {warper.phone}
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td className="text-[10px] font-bold text-zinc-600 uppercase py-0.5 pr-2 whitespace-nowrap align-top">
+                        {language === 'ta' ? 'தேதி:' : 'Date:'}
+                      </td>
+                      <td className="text-xs font-black text-black text-right py-0.5">
+                        {formattedDate}
+                      </td>
+                    </tr>
+                    {(startDate || endDate) && (
+                      <tr>
+                        <td className="text-[10px] font-bold text-zinc-600 uppercase py-0.5 pr-2 whitespace-nowrap align-top">
+                          {language === 'ta' ? 'காலம்:' : 'Period:'}
+                        </td>
+                        <td className="text-[11px] font-bold text-black text-right py-0.5">
+                          {startDate ? new Date(startDate).toLocaleDateString('ta-IN') : '—'} முதல் {endDate ? new Date(endDate).toLocaleDateString('ta-IN') : '—'}
+                        </td>
+                      </tr>
+                    )}
+                    <tr className="border-t border-zinc-300">
+                      <td className="text-[10px] font-black text-zinc-700 uppercase pt-1 pr-2 whitespace-nowrap align-top">
+                        {language === 'ta' ? 'டீனியர்:' : 'Denier:'}
+                      </td>
+                      <td className="text-[11px] font-black text-black text-right pt-1">
+                        {isAll ? (language === 'ta' ? 'அனைத்து டீனியர்கள்' : 'All Deniers') : currentDeniers.join(', ')}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
