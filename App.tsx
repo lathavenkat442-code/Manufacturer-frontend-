@@ -1105,7 +1105,7 @@ const App: React.FC = () => {
       <Toast message={toast.msg} show={toast.show} isError={toast.isError} onClose={() => setToast({ ...toast, show: false })} />
       
       {/* Desktop Sidebar */}
-      <aside className="sidebar-container hidden md:flex flex-col w-64 bg-zinc-950 text-zinc-300 h-screen sticky top-0 z-50 border-r border-zinc-800">
+      <aside className="sidebar-container hidden md:flex flex-col w-64 bg-zinc-950 text-zinc-300 h-screen sticky top-0 z-50 border-r border-zinc-800 print:hidden">
         <div className="p-6 flex items-center gap-3">
           <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain rounded-full bg-white p-0.5" onError={(e) => e.currentTarget.style.display = 'none'} />
           <h1 className="text-2xl font-black tamil-font truncate text-white tracking-tight">{customAppName || t.appName}</h1>
@@ -1165,9 +1165,9 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden print:h-auto print:overflow-visible">
         {/* Mobile Header */}
-        <header className="md:hidden bg-white text-zinc-900 p-4 sticky top-0 z-40 border-b border-zinc-200 flex flex-wrap gap-2 justify-between items-center theme-btn-white">
+        <header className="md:hidden bg-white text-zinc-900 p-4 sticky top-0 z-40 border-b border-zinc-200 flex flex-wrap gap-2 justify-between items-center theme-btn-white print:hidden">
           <div className="flex items-center gap-3">
               <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain rounded-full bg-white p-0.5 shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
               <h1 className="text-xl font-black tamil-font truncate tracking-tight">{customAppName || t.appName}</h1>
@@ -1200,7 +1200,7 @@ const App: React.FC = () => {
         </header>
 
         {/* Desktop Header */}
-        <header className="hidden md:flex bg-white border-b border-zinc-200 p-5 sticky top-0 z-40 items-center justify-between theme-btn-white">
+        <header className="hidden md:flex bg-white border-b border-zinc-200 p-5 sticky top-0 z-40 items-center justify-between theme-btn-white print:hidden">
           <h2 className="text-2xl font-black text-zinc-900 tamil-font tracking-tight" style={{ color: 'inherit' }}>
             {activeTab === 'dashboard' && (language === 'ta' ? 'முகப்பு' : 'Dashboard')}
             {activeTab === 'stock' && (language === 'ta' ? 'சரக்கு' : 'Stock')}

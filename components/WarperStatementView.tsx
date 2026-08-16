@@ -170,6 +170,29 @@ export const WarperStatementView: React.FC<StatementProps> = ({
     shareText(text);
   };
 
+  // Load company profile from localStorage
+  const savedProfile = localStorage.getItem(`viyabaari_company_profile_guest`) || 
+                       Object.keys(localStorage)
+                         .filter(k => k.startsWith('viyabaari_company_profile_'))
+                         .map(k => localStorage.getItem(k))
+                         .find(v => !!v);
+                         
+  let companyProfile = {
+    name: 'VIYABAARI TEXTILES',
+    tamilName: 'வியாபாரி டெக்ஸ்டைல்ஸ்',
+    gstin: '',
+    phone: '',
+    address: ''
+  };
+
+  if (savedProfile) {
+    try {
+      companyProfile = { ...companyProfile, ...JSON.parse(savedProfile) };
+    } catch (e) {
+      console.error('Failed to parse company profile', e);
+    }
+  }
+
   return (
     <div className="bg-white min-h-screen p-4 md:p-8 print:p-0 print:bg-white">
       {/* மேல் பகுதி கன்ட்ரோல்கள் (பிரிண்ட் ஆகும்போது மறையும்) */}
@@ -239,18 +262,39 @@ export const WarperStatementView: React.FC<StatementProps> = ({
 
       {/* அறிக்கை அச்சிடும் பகுதி */}
       <div className="max-w-4xl mx-auto border border-gray-200 rounded-2xl p-6 print:border-none print:p-0 print:max-w-none">
-        <div className="text-center mb-8 border-b pb-6">
-          <h1 className="text-2xl font-black text-gray-900 mb-2">
-            {language === 'ta' ? 'வார்ப்புகாரர் அறிக்கை' : 'Warper Statement'}
-          </h1>
-          <h2 className="text-xl font-bold text-gray-700">{warper.name}</h2>
-          {warper.phone && <p className="text-gray-500 mt-1">{warper.phone}</p>}
-          {(startDate || endDate) && (
-            <p className="text-sm font-bold text-gray-500 mt-2">
-              {startDate ? new Date(startDate).toLocaleDateString() : 'Start'} -{' '}
-              {endDate ? new Date(endDate).toLocaleDateString() : 'End'}
-            </p>
-          )}
+        <div className="border-b-2 border-black pb-3 mb-4">
+          <div className="flex justify-between items-start">
+            {/* Left Corner: Title and Shop Name */}
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-black tracking-tight uppercase leading-tight font-sans">
+                {language === 'ta' ? 'வார்ப்புகாரர் கணக்கு அறிக்கை' : 'WARPER LEDGER STATEMENT'}
+              </h1>
+              <p className="text-sm sm:text-base font-black text-zinc-900 mt-1 uppercase">
+                {companyProfile.tamilName || companyProfile.name || 'வியாபாரி டெக்ஸ்டைல்ஸ்'}
+              </p>
+              {companyProfile.address && (
+                <p className="text-[11px] font-bold text-zinc-700 mt-0.5">
+                  {companyProfile.address}
+                </p>
+              )}
+            </div>
+
+            {/* Right Corner: Warper Name and Date */}
+            <div className="text-right">
+              <p className="text-base sm:text-lg font-black text-black uppercase">
+                {warper.name}
+              </p>
+              {warper.phone && <p className="text-xs font-bold text-zinc-700 mt-0.5">போன்: {warper.phone}</p>}
+              <p className="text-xs font-black text-black mt-1">
+                {language === 'ta' ? 'தேதி:' : 'Date:'} {new Date().toLocaleDateString('ta-IN')}
+              </p>
+              {(startDate || endDate) && (
+                <p className="text-[11px] font-bold text-zinc-700 mt-0.5">
+                  {startDate ? new Date(startDate).toLocaleDateString('ta-IN') : '—'} முதல் {endDate ? new Date(endDate).toLocaleDateString('ta-IN') : '—'}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* அட்டவணை (Table) */}

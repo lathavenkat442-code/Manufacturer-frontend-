@@ -7,6 +7,7 @@ import { useLongPress } from '../lib/hooks';
 import { useConfirm } from '../context/ConfirmContext';
 import { WarperStatementView } from './WarperStatementView';
 import { WarpOrderPrintModal } from './WarpOrderPrintModal';
+import { WarperLedgerPrintModal } from './WarperLedgerPrintModal';
 import { saveDataAndSync, deleteDataAndSync } from '../lib/supabaseSync';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -468,6 +469,7 @@ const Warpers: React.FC<WarpersProps> = ({
   const [topWarpTotalYarnWeight, setTopWarpTotalYarnWeight] = useState('');
   const [topWarpSections, setTopWarpSections] = useState<WarpSection[]>([{ name: 'மேல் வார்ப்பு', ends: 0, color: '' }]);
   const [printingOrder, setPrintingOrder] = useState<WarpOrder | null>(null);
+  const [printingWarperLedger, setPrintingWarperLedger] = useState<Warper | null>(null);
 
   const [isAssigningOrder, setIsAssigningOrder] = useState<string | null>(null);
   const [assignWeaverId, setAssignWeaverId] = useState('');
@@ -602,7 +604,8 @@ const Warpers: React.FC<WarpersProps> = ({
       isPopping.current = true;
       
       // Order of precedence for closing sub-views
-      if (printingOrder) { setPrintingOrder(null); }
+      if (printingWarperLedger) { setPrintingWarperLedger(null); }
+      else if (printingOrder) { setPrintingOrder(null); }
       else if (isAdding) { setIsAdding(false); }
       else if (isAddingReturn) { setIsAddingReturn(false); }
       else if (isAddingDispatch) { setIsAddingDispatch(false); }
@@ -628,7 +631,7 @@ const Warpers: React.FC<WarpersProps> = ({
       }, 100);
     };
 
-    const anySubViewOpen = printingOrder || isAdding || isAddingReturn || isAddingDispatch || isManagingFormulas || isCreatingOrder || isCreatingDesign || viewingDesignId || isAssigningOrder || viewStatement || selectedWarper || selectedTxnDetails || expandedOrderId;
+    const anySubViewOpen = printingWarperLedger || printingOrder || isAdding || isAddingReturn || isAddingDispatch || isManagingFormulas || isCreatingOrder || isCreatingDesign || viewingDesignId || isAssigningOrder || viewStatement || selectedWarper || selectedTxnDetails || expandedOrderId;
     
     // Only push if we are entering a subview state and don't already have one
     if (anySubViewOpen && !window.history.state?.subview && !isPopping.current) {
@@ -637,7 +640,7 @@ const Warpers: React.FC<WarpersProps> = ({
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [printingOrder, isAdding, isAddingReturn, isAddingDispatch, isManagingFormulas, isCreatingOrder, isCreatingDesign, viewingDesignId, isAssigningOrder, viewStatement, selectedWarper, selectedTxnDetails, expandedOrderId, viewType]);
+  }, [printingWarperLedger, printingOrder, isAdding, isAddingReturn, isAddingDispatch, isManagingFormulas, isCreatingOrder, isCreatingDesign, viewingDesignId, isAssigningOrder, viewStatement, selectedWarper, selectedTxnDetails, expandedOrderId, viewType]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -2885,12 +2888,7 @@ const Warpers: React.FC<WarpersProps> = ({
               };
 
               const handlePrintStatement = () => {
-                if (!showStatementPreview) {
-                  setShowStatementPreview(true);
-                }
-                setTimeout(() => {
-                  window.print();
-                }, 100);
+                setPrintingWarperLedger(selectedWarper);
               };
 
               return (
@@ -5479,6 +5477,20 @@ const Warpers: React.FC<WarpersProps> = ({
           returns={returns}
           language={language}
           onClose={() => setPrintingOrder(null)}
+        />
+      )}
+
+      {printingWarperLedger && (
+        <WarperLedgerPrintModal
+          warper={printingWarperLedger}
+          dispatches={dispatches}
+          returns={returns}
+          selectedDeniers={selectedDeniers}
+          initialStartDate={startDate}
+          initialEndDate={endDate}
+          language={language}
+          onClose={() => setPrintingWarperLedger(null)}
+          autoPrint={false}
         />
       )}
 

@@ -79,26 +79,32 @@
 
         /* Print styling for clean A4 sheet output */
         @media print {
-            body {
+            body, html {
                 background: white !important;
                 color: black !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
-            .print\:hidden {
+            header, aside, nav, .print\:hidden, [class*="print:hidden"] {
                 display: none !important;
             }
             @page {
                 size: A4 portrait;
-                margin: 10mm 12mm 10mm 12mm;
+                margin: 8mm 8mm 8mm 8mm;
             }
             /* Guarantee standard tables fit full printable width of page */
             #pdf-statement-content,
             #pdf-supplier-statement,
             #pdf-warper-statement,
+            #pdf-warper-statement-container,
+            #pdf-warp-order-print-container,
+            #pdf-ledger-print-container,
             #pdf-statement-accounting,
             [id^="pdf-loom-statement-"],
-            .max-w-4xl {
+            .max-w-4xl,
+            .max-w-5xl {
                 display: block !important;
                 overflow: visible !important;
                 width: 100% !important;
@@ -115,6 +121,7 @@
             table {
                 width: 100% !important;
                 page-break-inside: auto;
+                border-collapse: collapse !important;
             }
             tr {
                 page-break-inside: avoid;
