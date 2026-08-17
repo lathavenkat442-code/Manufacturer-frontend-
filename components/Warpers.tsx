@@ -3241,10 +3241,98 @@ const Warpers: React.FC<WarpersProps> = ({
                                   <td style={{ width: columnWidths['sno'] || 45, minWidth: columnWidths['sno'] || 45 }} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-gray-500 font-medium text-center`}>{startIndex + idx + 1}</td>
                                   <td 
                                     style={{ width: columnWidths['particulars'] || 180, minWidth: columnWidths['particulars'] || 180 }}
-                                    className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border font-black text-blue-700 cursor-pointer hover:underline whitespace-normal break-words leading-tight`}
+                                    className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border font-bold text-gray-900 cursor-pointer hover:bg-blue-50/50 whitespace-normal break-words leading-tight`}
                                     onClick={() => setSelectedTxnDetails(txn)}
                                   >
-                                    {particularsText}
+                                    {txn.isDispatch ? (
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="font-black text-emerald-700">
+                                          {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
+                                          {txn.supplierName ? ` - ${txn.supplierName}` : ''}
+                                        </span>
+                                        {txn.billNumber && (
+                                          <span className="text-[11px] font-bold text-gray-500">
+                                            {language === 'ta' ? 'பில்' : 'Bill'}: #{txn.billNumber}
+                                          </span>
+                                        )}
+                                        {txn.items && txn.items.length > 0 && (
+                                          <div className="flex flex-col gap-0.5 mt-0.5">
+                                            {txn.items.map((item: any, iIdx: number) => (
+                                              <span key={iIdx} className="text-[11px] text-gray-700 font-semibold">
+                                                {item.yarnType ? `${item.yarnType} ` : ''}{item.color} - {item.weightKg} kg
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (() => {
+                                      const order = warpOrders.find(o => o.id === txn.orderId);
+                                      const weaverName = order?.weaverName || txn.weaverName || '';
+                                      const loomNumber = order?.loomNumber || txn.loomNumber || (looms.find(l => l.id === txn.loomId || l.id === order?.loomId)?.loomNumber) || '';
+                                      const orderNo = order?.orderNumber || txn.orderNumber || (order?.id ? order.id.slice(-6) : '');
+
+                                      const sectionItems: { denier: string; color: string; ends: number | string }[] = [];
+                                      if (txn.sections && Array.isArray(txn.sections) && txn.sections.length > 0) {
+                                        txn.sections.forEach((s: any) => {
+                                          if (s.color) {
+                                            const denierPart = s.name ? s.name.split(' - ')[0] : '';
+                                            sectionItems.push({
+                                              denier: denierPart,
+                                              color: s.color,
+                                              ends: s.ends || 0
+                                            });
+                                          }
+                                        });
+                                      } else if (order?.sections && Array.isArray(order.sections) && order.sections.length > 0) {
+                                        order.sections.forEach((s: any) => {
+                                          if (s.color) {
+                                            const denierPart = s.name ? s.name.split(' - ')[0] : '';
+                                            sectionItems.push({
+                                              denier: denierPart,
+                                              color: s.color,
+                                              ends: s.ends || 0
+                                            });
+                                          }
+                                        });
+                                      } else if (txn.color) {
+                                        sectionItems.push({
+                                          denier: txn.yarnType || '',
+                                          color: txn.color,
+                                          ends: txn.ends || 0
+                                        });
+                                      }
+
+                                      return (
+                                        <div className="flex flex-col gap-0.5 text-left">
+                                          {/* 1. Weaver Name with Loom Number */}
+                                          <div className="font-black text-blue-700">
+                                            {weaverName ? (
+                                              <span>{weaverName} {loomNumber ? `(${language === 'ta' ? 'தறி' : 'Loom'} ${loomNumber})` : ''}</span>
+                                            ) : (
+                                              <span>{language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'} {loomNumber ? `(${language === 'ta' ? 'தறி' : 'Loom'} ${loomNumber})` : ''}</span>
+                                            )}
+                                          </div>
+
+                                          {/* 2. Order ID */}
+                                          {orderNo && (
+                                            <div className="text-[11px] font-black text-gray-700">
+                                              {orderNo.startsWith('ORD-') ? orderNo : `ORD-${orderNo}`}
+                                            </div>
+                                          )}
+
+                                          {/* 3. Denier Color Ends lines */}
+                                          {sectionItems.length > 0 && (
+                                            <div className="flex flex-col gap-0.5 mt-0.5">
+                                              {sectionItems.map((item, sIdx) => (
+                                                <div key={sIdx} className="text-[11px] text-gray-800 font-semibold">
+                                                  {item.denier ? `${item.denier} ` : ''}{item.color} - {item.ends} {language === 'ta' ? 'இழை' : 'ends'}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                   </td>
                                   <td style={{ width: columnWidths['ends'] || 55, minWidth: columnWidths['ends'] || 55 }} className={`${baseColumnWidth < 50 || allDenierColors.length > 12 ? 'p-1.5' : 'p-2'} border text-center font-bold text-gray-600`}>
                                     {!txn.isDispatch && (txn.ends !== undefined && txn.ends !== null) ? txn.ends : '-'}
@@ -5402,6 +5490,8 @@ const Warpers: React.FC<WarpersProps> = ({
           warper={printingWarperLedger}
           dispatches={dispatches}
           returns={returns}
+          warpOrders={warpOrders}
+          looms={looms}
           selectedDeniers={selectedDeniers}
           initialStartDate={startDate}
           initialEndDate={endDate}

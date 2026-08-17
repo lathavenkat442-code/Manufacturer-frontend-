@@ -8,6 +8,8 @@ interface WarperLedgerPrintModalProps {
   warper: Warper;
   dispatches: YarnDispatch[];
   returns: WarperReturn[];
+  warpOrders?: any[];
+  looms?: any[];
   selectedDeniers?: string[];
   initialStartDate?: string;
   initialEndDate?: string;
@@ -20,6 +22,8 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
   warper,
   dispatches,
   returns,
+  warpOrders = [],
+  looms = [],
   selectedDeniers = ['ALL'],
   initialStartDate = '',
   initialEndDate = '',
@@ -597,39 +601,95 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
                       </td>
                       <td className={`border border-black ${isUltraDensity ? 'px-1 py-0.5 text-[8.5px]' : isHighDensity ? 'px-1.5 py-0.5 text-[9.5px]' : 'px-2 py-1 text-xs'} text-left font-bold text-black leading-snug`}>
                         {isDispatch ? (
-                          <div className="flex flex-wrap items-center gap-1">
-                            <span className="text-emerald-700 print:text-black font-black">
-                              {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
-                            </span>
-                            {txn.supplierName && (
-                              <span className="text-zinc-700 font-bold">
-                                - {txn.supplierName}
-                              </span>
-                            )}
-                            {txn.billNumber && (
-                              <span className="text-zinc-500 font-medium">
-                                (#{txn.billNumber})
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div>
+                          <div className="flex flex-col gap-0.5">
                             <div className="font-black text-black">
-                              {txn.weaverName ? (
-                                <span>{txn.weaverName} {txn.orderNo ? `(ORD-${txn.orderNo})` : ''}</span>
-                              ) : txn.orderNo ? (
-                                <span>ORD-{txn.orderNo}</span>
-                              ) : (
-                                <span>{language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'}</span>
-                              )}
+                              {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
+                              {txn.supplierName && ` - ${txn.supplierName}`}
                             </div>
-                            {txn.sections && txn.sections.length > 0 && (
-                              <div className="text-[8px] sm:text-[9px] font-bold text-zinc-700 mt-0.5 leading-tight">
-                                {txn.sections.filter((s: any) => s.color).map((s: any) => `${s.color} (${s.ends || 0})`).join(', ')}
+                            {txn.billNumber && (
+                              <div className="text-[10px] sm:text-xs font-bold text-zinc-600">
+                                {language === 'ta' ? 'பில் எண்' : 'Bill'}: #{txn.billNumber}
+                              </div>
+                            )}
+                            {txn.items && txn.items.length > 0 && (
+                              <div className="flex flex-col gap-0.5 mt-0.5">
+                                {txn.items.map((item: any, iIdx: number) => (
+                                  <div key={iIdx} className="text-[10px] sm:text-xs text-zinc-700 font-semibold">
+                                    {item.yarnType ? `${item.yarnType} ` : ''}{item.color} - {item.weightKg} kg
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
-                        )}
+                        ) : (() => {
+                          const order = warpOrders.find((o: any) => o.id === txn.orderId);
+                          const weaverName = order?.weaverName || txn.weaverName || '';
+                          const loomNumber = order?.loomNumber || txn.loomNumber || (looms.find((l: any) => l.id === txn.loomId || l.id === order?.loomId)?.loomNumber) || '';
+                          const orderNo = order?.orderNumber || txn.orderNo || txn.orderNumber || (order?.id ? order.id.slice(-6) : '');
+                          
+                          // Section items breakdown
+                          const sectionItems: { denier: string; color: string; ends: number | string }[] = [];
+                          if (txn.sections && Array.isArray(txn.sections) && txn.sections.length > 0) {
+                            txn.sections.forEach((s: any) => {
+                              if (s.color) {
+                                const denierPart = s.name ? s.name.split(' - ')[0] : '';
+                                sectionItems.push({
+                                  denier: denierPart,
+                                  color: s.color,
+                                  ends: s.ends || 0
+                                });
+                              }
+                            });
+                          } else if (order?.sections && Array.isArray(order.sections) && order.sections.length > 0) {
+                            order.sections.forEach((s: any) => {
+                              if (s.color) {
+                                const denierPart = s.name ? s.name.split(' - ')[0] : '';
+                                sectionItems.push({
+                                  denier: denierPart,
+                                  color: s.color,
+                                  ends: s.ends || 0
+                                });
+                              }
+                            });
+                          } else if (txn.color) {
+                            sectionItems.push({
+                              denier: txn.yarnType || '',
+                              color: txn.color,
+                              ends: txn.ends || 0
+                            });
+                          }
+
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              {/* 1st Line: தரிக்காரர் பெயர் அதன் அருகில் தறி எண் */}
+                              <div className="font-black text-black">
+                                {weaverName ? (
+                                  <span>{weaverName} {loomNumber ? `(${language === 'ta' ? 'தறி' : 'Loom'} ${loomNumber})` : ''}</span>
+                                ) : (
+                                  <span>{language === 'ta' ? 'வார்ப்பு வரவு' : 'Warp Done'} {loomNumber ? `(${language === 'ta' ? 'தறி' : 'Loom'} ${loomNumber})` : ''}</span>
+                                )}
+                              </div>
+
+                              {/* 2nd Line: ஆர்டர் ஐடி */}
+                              {orderNo && (
+                                <div className="text-[10px] sm:text-xs font-black text-zinc-700">
+                                  {orderNo.startsWith('ORD-') ? orderNo : `ORD-${orderNo}`}
+                                </div>
+                              )}
+
+                              {/* 3rd Line onwards: டீனியர் அதன் அருகே கலர் அதன் அருகே எத்தனை இழை */}
+                              {sectionItems.length > 0 && (
+                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                  {sectionItems.map((item, sIdx) => (
+                                    <div key={sIdx} className="text-[10px] sm:text-xs text-zinc-800 font-semibold">
+                                      {item.denier ? `${item.denier} ` : ''}{item.color} - {item.ends} {language === 'ta' ? 'இழை' : 'ends'}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5 text-[8px]' : isHighDensity ? 'px-0.5 py-0.5 text-[9px]' : 'px-1 py-1 text-xs'} text-center font-bold text-black whitespace-nowrap`}>
                         {!isDispatch ? (
