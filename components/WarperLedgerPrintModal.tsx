@@ -233,53 +233,52 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
     const actualWidth = tableEl ? Math.max(tableEl.scrollWidth, tableEl.offsetWidth, 1100) : 1100;
     const captureWidth = actualWidth + 50;
 
-    const opt = {
-      margin: 8,
-      filename: filename,
-      image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        backgroundColor: '#ffffff',
-        width: captureWidth,
-        windowWidth: captureWidth + 40,
-        scrollX: 0,
-        scrollY: 0,
-        onclone: (clonedDoc: Document) => {
-          clonedDoc.body.style.width = `${captureWidth}px`;
-          clonedDoc.body.style.maxWidth = 'none';
-          clonedDoc.body.style.overflow = 'visible';
+      const opt = {
+        margin: [8, 8, 8, 8] as [number, number, number, number],
+        filename: filename,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          backgroundColor: '#ffffff',
+          width: captureWidth,
+          windowWidth: captureWidth,
+          scrollX: 0,
+          scrollY: 0,
+          onclone: (clonedDoc: Document) => {
+            clonedDoc.body.style.width = `${captureWidth}px`;
+            clonedDoc.body.style.maxWidth = 'none';
+            clonedDoc.body.style.overflow = 'visible';
 
-          const el = clonedDoc.getElementById('pdf-warper-statement-container');
-          if (el) {
-            el.style.width = `${captureWidth}px`;
-            el.style.minWidth = `${captureWidth}px`;
-            el.style.maxWidth = 'none';
-            el.style.overflow = 'visible';
-            el.style.padding = '15px';
-            el.style.boxShadow = 'none';
-          }
-          const wrappers = clonedDoc.querySelectorAll('.overflow-x-auto, .overflow-auto');
-          wrappers.forEach(w => {
-            if (w instanceof HTMLElement) {
-              w.style.overflow = 'visible';
-              w.style.width = '100%';
-              w.style.maxWidth = 'none';
+            const el = clonedDoc.getElementById('pdf-warper-statement-container');
+            if (el) {
+              el.style.width = `${captureWidth}px`;
+              el.style.minWidth = `${captureWidth}px`;
+              el.style.maxWidth = 'none';
+              el.style.overflow = 'visible';
+              el.style.padding = '8px 12px';
+              el.style.boxShadow = 'none';
             }
-          });
+            const wrappers = clonedDoc.querySelectorAll('.overflow-x-auto, .overflow-auto');
+            wrappers.forEach(w => {
+              if (w instanceof HTMLElement) {
+                w.style.overflow = 'visible';
+                w.style.width = '100%';
+                w.style.maxWidth = 'none';
+              }
+            });
+          }
+        },
+        jsPDF: {
+          unit: 'pt',
+          format: 'a4',
+          orientation: orientation === 'portrait' ? ('portrait' as const) : ('landscape' as const)
+        },
+        pagebreak: {
+          mode: ['css', 'legacy']
         }
-      },
-      jsPDF: {
-        unit: 'pt',
-        format: 'a4',
-        orientation: 'landscape' as const
-      },
-      pagebreak: {
-        mode: ['avoid-all', 'css', 'legacy'],
-        avoid: ['tr', 'thead', 'tfoot', '.avoid-break']
-      }
-    };
+      };
 
     try {
       await html2pdf().set(opt).from(printRef.current).save();
@@ -324,14 +323,20 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
         @media print {
           @page {
             size: ${orientation === 'landscape' ? 'landscape' : 'portrait'};
-            margin: 5mm;
+            margin: 4mm 5mm 5mm 5mm;
           }
           body, html {
             width: 100% !important;
             height: auto !important;
+            min-height: 0 !important;
             background-color: #ffffff !important;
             color: #000000 !important;
             overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .print\\:hidden, [class*="print:hidden"] {
+            display: none !important;
           }
           #pdf-warper-statement-container {
             display: block !important;
@@ -341,20 +346,34 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
             padding: 0 !important;
             margin: 0 !important;
             box-shadow: none !important;
+            border: none !important;
+            overflow: visible !important;
+          }
+          #pdf-warper-statement-container .overflow-x-auto {
+            overflow: visible !important;
+            display: block !important;
+            width: 100% !important;
           }
           #pdf-warper-statement-container table {
             width: 100% !important;
             table-layout: auto !important;
+            border-collapse: collapse !important;
           }
-          tr {
+          #pdf-warper-statement-container tbody tr {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            page-break-after: auto !important;
+            break-after: auto !important;
           }
-          thead {
+          #pdf-warper-statement-container thead {
             display: table-header-group !important;
           }
-          tfoot {
+          #pdf-warper-statement-container tfoot {
             display: table-footer-group !important;
+          }
+          .avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
