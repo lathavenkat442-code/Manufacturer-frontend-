@@ -30,11 +30,11 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
   const printRef = useRef<HTMLDivElement>(null);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
-  const [currentDeniers] = useState<string[]>(selectedDeniers);
+  const [currentDeniers, setCurrentDeniers] = useState<string[]>(selectedDeniers);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Filter Dispatches & Returns for this Warper
-  const isAll = currentDeniers.includes('ALL');
+  const isAll = currentDeniers.includes('ALL') || currentDeniers.length === 0;
   
   let warperDispatches = dispatches.filter(d => d.recipientType === 'warper' && d.recipientId === warper.id);
   let warperReturns = returns.filter(r => r.warperId === warper.id);
@@ -58,7 +58,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
     warperReturns = warperReturns.filter(r => r.date <= endDate);
   }
 
-  // Collect all unique denier|color pairs
+  // Collect all unique denier|color pairs across ALL dispatches and returns
   const allDenierColors = Array.from(new Set([
     ...warperDispatches.filter(d => d.color).map(d => `${d.yarnType}|${d.color}`),
     ...warperReturns.flatMap(r => {
@@ -74,8 +74,9 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
     })
   ])).filter(Boolean).sort();
 
+  // Determine optimal orientation: default landscape for wide tables
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>(() => {
-    return allDenierColors.length > 4 ? 'landscape' : 'portrait';
+    return allDenierColors.length > 5 ? 'landscape' : 'landscape';
   });
 
   // Handle hardware / browser back button and ESC key
@@ -135,7 +136,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
     }
   }
 
-  // Group dispatches by date and batch
+  // Group dispatches by date and batch/id
   const groupedDispatches = Object.values(warperDispatches.reduce((acc, d) => {
     const key = d.createdAt || d.id;
     if (!acc[key]) {
@@ -205,55 +206,55 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
     year: 'numeric'
   });
 
-  // Calculate table layout sizing based on column count to avoid clipping
+  // Calculate table layout sizing based on column count
   const numColorCols = allDenierColors.length;
-  const isHighDensity = numColorCols > 7;
-  const isUltraDensity = numColorCols > 12;
+  const isCompact = numColorCols > 5;
+  const isHighDensity = numColorCols > 9;
+  const isUltraDensity = numColorCols > 14;
 
   // Print Handler
   const handlePrint = () => {
     window.print();
   };
 
-  // Download PDF Handler - Full capture width calculation ensuring ALL data and columns fit without cut-off
+  // Download PDF Handler - Full capture width ensuring ALL columns & rows fit without horizontal cut-off
   const handleDownloadPDF = async () => {
     if (!printRef.current) return;
     setIsGeneratingPdf(true);
     const cleanName = (warper.name || 'warper').replace(/[^a-zA-Z0-9]/g, '_');
     const filename = `${cleanName}_ledger_statement_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    // Measure table's actual scroll width so nothing gets clipped
+    // Measure table's actual scroll width to guarantee zero cut-off
     const tableEl = printRef.current.querySelector('table');
-    const tableWidth = tableEl ? tableEl.scrollWidth : 1000;
-    const captureWidth = Math.max(950, tableWidth + 60);
-
-    const isLandscapeMode = orientation === 'landscape' || numColorCols > 5;
-    const marginPt = 15;
-    const pageWidthPoints = (captureWidth * 0.75) + (marginPt * 2);
-    const aspectRatio = isLandscapeMode ? 1.414 : 0.707;
-    const pageHeightPoints = pageWidthPoints / aspectRatio;
+    const actualWidth = tableEl ? Math.max(tableEl.scrollWidth, tableEl.offsetWidth, 1100) : 1100;
+    const captureWidth = actualWidth + 50;
 
     const opt = {
-      margin: marginPt,
+      margin: 8,
       filename: filename,
       image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: {
-        scale: 2.2,
+        scale: 2,
         useCORS: true,
         letterRendering: true,
         backgroundColor: '#ffffff',
         width: captureWidth,
-        windowWidth: captureWidth,
+        windowWidth: captureWidth + 40,
         scrollX: 0,
         scrollY: 0,
         onclone: (clonedDoc: Document) => {
+          clonedDoc.body.style.width = `${captureWidth}px`;
+          clonedDoc.body.style.maxWidth = 'none';
+          clonedDoc.body.style.overflow = 'visible';
+
           const el = clonedDoc.getElementById('pdf-warper-statement-container');
           if (el) {
             el.style.width = `${captureWidth}px`;
             el.style.minWidth = `${captureWidth}px`;
             el.style.maxWidth = 'none';
             el.style.overflow = 'visible';
-            el.style.padding = '20px';
+            el.style.padding = '15px';
+            el.style.boxShadow = 'none';
           }
           const wrappers = clonedDoc.querySelectorAll('.overflow-x-auto, .overflow-auto');
           wrappers.forEach(w => {
@@ -267,8 +268,12 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
       },
       jsPDF: {
         unit: 'pt',
-        format: [pageWidthPoints, pageHeightPoints] as [number, number],
-        orientation: isLandscapeMode ? ('landscape' as const) : ('portrait' as const)
+        format: 'a4',
+        orientation: 'landscape' as const
+      },
+      pagebreak: {
+        mode: ['avoid-all', 'css', 'legacy'],
+        avoid: ['tr', 'thead', 'tfoot', '.avoid-break']
       }
     };
 
@@ -317,21 +322,36 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
             size: ${orientation === 'landscape' ? 'landscape' : 'portrait'};
             margin: 5mm;
           }
+          body, html {
+            width: 100% !important;
+            overflow: visible !important;
+          }
           #pdf-warper-statement-container {
             width: 100% !important;
             max-width: none !important;
             padding: 0 !important;
             margin: 0 !important;
+            box-shadow: none !important;
           }
           #pdf-warper-statement-container table {
             width: 100% !important;
-            font-size: ${isUltraDensity ? '9px' : isHighDensity ? '10px' : '11px'} !important;
+            table-layout: auto !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          thead {
+            display: table-header-group !important;
+          }
+          tfoot {
+            display: table-footer-group !important;
           }
         }
       `}</style>
 
       {/* Top Action Bar (Hidden in Print) */}
-      <div className="max-w-6xl mx-auto mb-4 bg-zinc-900 text-white p-3 sm:p-4 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-3 border border-zinc-800 print:hidden">
+      <div className="max-w-7xl mx-auto mb-4 bg-zinc-900 text-white p-3 sm:p-4 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-3 border border-zinc-800 print:hidden">
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
@@ -347,7 +367,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
               {warper.name} - {language === 'ta' ? 'கணக்கு அறிக்கை' : 'Statement'}
             </h2>
             <p className="text-[10px] text-zinc-400 font-medium">
-              {processedTxns.length} {language === 'ta' ? 'பதிவுகள்' : 'entries'} • {allDenierColors.length} {language === 'ta' ? 'கலர்கள்' : 'colors'}
+              {processedTxns.length} {language === 'ta' ? 'பதிவுகள்' : 'entries'} • {allDenierColors.length} {language === 'ta' ? 'கலர்கள்/டீனியர்கள்' : 'colors/deniers'}
             </p>
           </div>
         </div>
@@ -429,12 +449,12 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
       <div 
         ref={printRef}
         id="pdf-warper-statement-container"
-        className="bg-white text-black p-4 sm:p-6 md:p-8 rounded-2xl shadow-2xl max-w-6xl mx-auto print:max-w-none print:w-full print:p-0 print:m-0 print:shadow-none print:rounded-none print:border-none font-sans"
+        className="bg-white text-black p-4 sm:p-6 md:p-8 rounded-2xl shadow-2xl max-w-7xl mx-auto print:max-w-none print:w-full print:p-0 print:m-0 print:shadow-none print:rounded-none print:border-none font-sans"
         style={{ color: '#000000', backgroundColor: '#ffffff' }}
       >
         {/* Top Header matching user's layout specification:
             Left Corner: "வார்ப்புகாரர் கணக்கு அறிக்கை" & Shop Name
-            Right Corner: Warper Name & Date */}
+            Right Corner: Warper Name, Date, Denier */}
         <div className="border-b-2 border-black pb-3 mb-4">
           <div className="flex justify-between items-start">
             {/* Left Corner */}
@@ -469,7 +489,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
                         {warper.name}
                       </td>
                     </tr>
-                    {warper.phone && (
+                    {warper.phone && !warper.phone.toLowerCase().includes('august') && !warper.phone.toLowerCase().includes('month') && (
                       <tr>
                         <td className="text-[10px] font-bold text-zinc-600 uppercase py-0.5 pr-2 whitespace-nowrap align-top">
                           {language === 'ta' ? 'போன்:' : 'Phone:'}
@@ -514,31 +534,31 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
 
         {/* Ledger Statement Table with ALL rows and full column fitting */}
         <div className="overflow-x-auto print:overflow-visible">
-          <table className={`w-full border-collapse border-2 border-black ${isUltraDensity ? 'text-[9.5px]' : isHighDensity ? 'text-[10.5px]' : 'text-xs'}`}>
+          <table className={`w-full border-collapse border-2 border-black ${isUltraDensity ? 'text-[8.5px]' : isHighDensity ? 'text-[9.5px]' : isCompact ? 'text-[10.5px]' : 'text-xs'}`}>
             <thead>
               <tr className="bg-zinc-100 print:bg-zinc-100 text-black font-black">
-                <th className={`border border-black ${isHighDensity ? 'px-1.5 py-1.5' : 'px-2 py-2'} text-center ${isHighDensity ? 'w-16' : 'w-20'} whitespace-nowrap`}>
+                <th className={`border border-black ${isUltraDensity ? 'px-1 py-1 text-[8.5px]' : isHighDensity ? 'px-1 py-1 text-[9px]' : 'px-1.5 py-1.5'} text-center whitespace-nowrap`}>
                   {language === 'ta' ? 'தேதி' : 'Date'}
                 </th>
-                <th className={`border border-black ${isHighDensity ? 'px-1 py-1.5' : 'px-1.5 py-2'} text-center ${isHighDensity ? 'w-9' : 'w-12'} whitespace-nowrap`}>
+                <th className={`border border-black ${isUltraDensity ? 'px-0.5 py-1 text-[8.5px]' : isHighDensity ? 'px-1 py-1 text-[9px]' : 'px-1.5 py-1.5'} text-center whitespace-nowrap`}>
                   {language === 'ta' ? 'வ.எண்' : 'S.No'}
                 </th>
-                <th className={`border border-black ${isHighDensity ? 'px-2 py-1.5' : 'px-2.5 py-2'} text-left min-w-[130px]`}>
+                <th className={`border border-black ${isUltraDensity ? 'px-1 py-1 text-[8.5px]' : isHighDensity ? 'px-1.5 py-1 text-[9.5px]' : 'px-2 py-1.5'} text-left`}>
                   {language === 'ta' ? 'விவரம்' : 'Particulars'}
                 </th>
-                <th className={`border border-black ${isHighDensity ? 'px-1 py-1.5' : 'px-1.5 py-2'} text-center ${isHighDensity ? 'w-11' : 'w-14'} whitespace-nowrap`}>
+                <th className={`border border-black ${isUltraDensity ? 'px-0.5 py-1 text-[8.5px]' : isHighDensity ? 'px-1 py-1 text-[9px]' : 'px-1.5 py-1.5'} text-center whitespace-nowrap`}>
                   {language === 'ta' ? 'இழை' : 'Ends'}
                 </th>
-                <th className={`border border-black ${isHighDensity ? 'px-1 py-1.5' : 'px-1.5 py-2'} text-center ${isHighDensity ? 'w-11' : 'w-14'} whitespace-nowrap`}>
+                <th className={`border border-black ${isUltraDensity ? 'px-0.5 py-1 text-[8.5px]' : isHighDensity ? 'px-1 py-1 text-[9px]' : 'px-1.5 py-1.5'} text-center whitespace-nowrap`}>
                   {language === 'ta' ? 'மீட்டர்' : 'Meter'}
                 </th>
                 {allDenierColors.map(dc => {
                   const [denier, color] = dc.split('|');
                   return (
-                    <th key={dc} className={`border border-black ${isUltraDensity ? 'px-1 py-1' : isHighDensity ? 'px-1.5 py-1.5' : 'px-2 py-2'} text-right ${isUltraDensity ? 'min-w-[52px]' : isHighDensity ? 'min-w-[60px]' : 'min-w-[70px]'}`}>
-                      <div className="leading-tight">
-                        <div className={`text-black font-black uppercase ${isUltraDensity ? 'text-[9px]' : isHighDensity ? 'text-[10px]' : 'text-[11px]'}`}>{color}</div>
-                        <div className={`text-zinc-600 font-bold ${isUltraDensity ? 'text-[8px]' : 'text-[9px]'}`}>{denier}</div>
+                    <th key={dc} className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5' : isHighDensity ? 'px-1 py-1' : 'px-1.5 py-1.5'} text-right`}>
+                      <div className="leading-tight text-center sm:text-right">
+                        <div className={`text-black font-black uppercase ${isUltraDensity ? 'text-[8px]' : isHighDensity ? 'text-[9px]' : 'text-[10px]'}`}>{color}</div>
+                        <div className={`text-zinc-600 font-bold ${isUltraDensity ? 'text-[7px]' : isHighDensity ? 'text-[8px]' : 'text-[9px]'}`}>{denier}</div>
                       </div>
                     </th>
                   );
@@ -562,33 +582,34 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
                     <tr 
                       key={txn.id || idx} 
                       className={`hover:bg-zinc-50 ${idx % 2 === 1 ? 'bg-zinc-50/70 print:bg-zinc-50' : 'bg-white'}`}
+                      style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
                     >
-                      <td className={`border border-black ${isHighDensity ? 'px-1 py-1' : 'px-2 py-1.5'} text-center font-bold text-black whitespace-nowrap`}>
+                      <td className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5 text-[8px]' : isHighDensity ? 'px-1 py-0.5 text-[9px]' : 'px-1.5 py-1 text-xs'} text-center font-bold text-black whitespace-nowrap`}>
                         {dateStr}
                       </td>
-                      <td className={`border border-black ${isHighDensity ? 'px-1 py-1' : 'px-1.5 py-1.5'} text-center font-black text-black`}>
+                      <td className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5 text-[8px]' : isHighDensity ? 'px-0.5 py-0.5 text-[9px]' : 'px-1 py-1 text-xs'} text-center font-black text-black`}>
                         {idx + 1}
                       </td>
-                      <td className={`border border-black ${isHighDensity ? 'px-1.5 py-1' : 'px-2.5 py-1.5'} text-left font-bold text-black leading-snug`}>
+                      <td className={`border border-black ${isUltraDensity ? 'px-1 py-0.5 text-[8.5px]' : isHighDensity ? 'px-1.5 py-0.5 text-[9.5px]' : 'px-2 py-1 text-xs'} text-left font-bold text-black leading-snug`}>
                         {isDispatch ? (
                           <div className="flex flex-wrap items-center gap-1">
-                            <span className="text-emerald-700 print:text-black font-black text-xs">
+                            <span className="text-emerald-700 print:text-black font-black">
                               {language === 'ta' ? 'நூல் வரவு' : 'Yarn Given'}
                             </span>
                             {txn.supplierName && (
-                              <span className="text-zinc-700 font-bold text-[10px]">
+                              <span className="text-zinc-700 font-bold">
                                 - {txn.supplierName}
                               </span>
                             )}
                             {txn.billNumber && (
-                              <span className="text-zinc-500 font-medium text-[10px]">
+                              <span className="text-zinc-500 font-medium">
                                 (#{txn.billNumber})
                               </span>
                             )}
                           </div>
                         ) : (
                           <div>
-                            <div className="font-black text-black text-xs">
+                            <div className="font-black text-black">
                               {txn.weaverName ? (
                                 <span>{txn.weaverName} {txn.orderNo ? `(ORD-${txn.orderNo})` : ''}</span>
                               ) : txn.orderNo ? (
@@ -598,19 +619,19 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
                               )}
                             </div>
                             {txn.sections && txn.sections.length > 0 && (
-                              <div className="text-[10px] font-bold text-zinc-700 mt-0.5 leading-tight">
+                              <div className="text-[8px] sm:text-[9px] font-bold text-zinc-700 mt-0.5 leading-tight">
                                 {txn.sections.filter((s: any) => s.color).map((s: any) => `${s.color} (${s.ends || 0})`).join(', ')}
                               </div>
                             )}
                           </div>
                         )}
                       </td>
-                      <td className={`border border-black ${isHighDensity ? 'px-1 py-1' : 'px-1.5 py-1.5'} text-center font-bold text-black`}>
+                      <td className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5 text-[8px]' : isHighDensity ? 'px-0.5 py-0.5 text-[9px]' : 'px-1 py-1 text-xs'} text-center font-bold text-black whitespace-nowrap`}>
                         {!isDispatch ? (
                           txn.totalEnds || txn.ends || (txn.sections ? txn.sections.reduce((sum: number, s: any) => sum + (Number(s.ends) || 0), 0) : '-')
                         ) : '-'}
                       </td>
-                      <td className={`border border-black ${isHighDensity ? 'px-1 py-1' : 'px-1.5 py-1.5'} text-center font-bold text-black`}>
+                      <td className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5 text-[8px]' : isHighDensity ? 'px-0.5 py-0.5 text-[9px]' : 'px-1 py-1 text-xs'} text-center font-bold text-black whitespace-nowrap`}>
                         {!isDispatch ? (txn.meters || '-') : '-'}
                       </td>
 
@@ -618,7 +639,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
                       {allDenierColors.map(dc => {
                         const weight = txn.colorWeights[dc] || 0;
                         return (
-                          <td key={dc} className={`border border-black ${isUltraDensity ? 'px-1 py-1' : isHighDensity ? 'px-1.5 py-1' : 'px-2 py-1.5'} text-right font-black whitespace-nowrap`}>
+                          <td key={dc} className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5 text-[8px]' : isHighDensity ? 'px-0.5 py-0.5 text-[9px]' : 'px-1 py-1 text-xs'} text-right font-black whitespace-nowrap`}>
                             {weight > 0 ? (
                               <span className={isDispatch ? 'text-emerald-700 print:text-black font-black' : 'text-rose-700 print:text-black font-black'}>
                                 {isDispatch ? '+' : '-'}{weight.toFixed(2)}
@@ -637,14 +658,14 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
 
             {/* Total Balances Footer */}
             <tfoot>
-              <tr className="bg-zinc-200 print:bg-zinc-200 text-black font-black border-t-2 border-black">
-                <td colSpan={5} className="border border-black px-2 py-2 text-right uppercase tracking-wider font-black">
+              <tr className="bg-zinc-200 print:bg-zinc-200 text-black font-black border-t-2 border-black" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                <td colSpan={5} className="border border-black px-2 py-1.5 text-right uppercase tracking-wider font-black whitespace-nowrap">
                   {language === 'ta' ? 'தற்போதைய இருப்பு (TOTAL BALANCE):' : 'CURRENT BALANCE:'}
                 </td>
                 {allDenierColors.map(dc => {
                   const bal = totalBalances[dc] || 0;
                   return (
-                    <td key={dc} className={`border border-black ${isUltraDensity ? 'px-1 py-1.5' : isHighDensity ? 'px-1.5 py-2' : 'px-2 py-2'} text-right font-black ${isUltraDensity ? 'text-[10px]' : isHighDensity ? 'text-xs' : 'text-sm'} text-black whitespace-nowrap`}>
+                    <td key={dc} className={`border border-black ${isUltraDensity ? 'px-0.5 py-1 text-[8.5px]' : isHighDensity ? 'px-0.5 py-1 text-[9.5px]' : 'px-1 py-1 text-xs'} text-right font-black text-black whitespace-nowrap`}>
                       {bal.toFixed(2)}
                     </td>
                   );
@@ -655,7 +676,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
         </div>
 
         {/* Footer / Signatures */}
-        <div className="mt-8 pt-6 border-t border-zinc-300 flex justify-between items-end text-xs font-bold text-black print:mt-8">
+        <div className="mt-8 pt-6 border-t border-zinc-300 flex justify-between items-end text-xs font-bold text-black print:mt-8 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           <div className="text-center min-w-[160px]">
             <div className="h-10"></div>
             <div className="border-t border-black pt-1 uppercase">
@@ -673,7 +694,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
       </div>
 
       {/* Bottom Back / Print Action Row (Hidden in Print) */}
-      <div className="max-w-6xl mx-auto mt-4 flex justify-between items-center print:hidden">
+      <div className="max-w-7xl mx-auto mt-4 flex justify-between items-center print:hidden">
         <button
           onClick={onClose}
           className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-sm font-black flex items-center gap-2 transition active:scale-95 cursor-pointer"
