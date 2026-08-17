@@ -2986,7 +2986,7 @@ const Warpers: React.FC<WarpersProps> = ({
                     )}
                   </div>
 
-                  <div ref={statementRef} id="pdf-statement-content" style={{ width: showStatementPreview ? 'max-content' : '100%', minWidth: showStatementPreview ? `${totalTableWidth + 120}px` : '100%' }} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 relative mx-auto mb-10 overflow-visible">
+                  <div ref={statementRef} id="pdf-statement-content" style={{ width: showStatementPreview ? 'max-content' : '100%', minWidth: showStatementPreview ? `${totalTableWidth + 120}px` : '100%' }} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 relative mx-auto mb-10 overflow-visible print:hidden">
                     {/* Edit Controls (Moved to top-relative to prevent overlapping) - Hidden in Print/PDF */}
                     <div className="flex flex-col items-end gap-2 mb-6 print:hidden">
                       {isEditingColumns && (

@@ -79,9 +79,10 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
     return allDenierColors.length > 5 ? 'landscape' : 'landscape';
   });
 
-  // Handle hardware / browser back button and ESC key
+  // Handle hardware / browser back button, ESC key and print isolate class
   useEffect(() => {
     window.history.pushState({ modal: 'warper_ledger_print', subview: true }, '');
+    document.body.classList.add('warper-ledger-print-open');
 
     const handlePopState = () => {
       onClose();
@@ -102,12 +103,14 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
       }, 300);
       return () => {
         clearTimeout(timer);
+        document.body.classList.remove('warper-ledger-print-open');
         window.removeEventListener('popstate', handlePopState);
         window.removeEventListener('keydown', handleKeyDown);
       };
     }
 
     return () => {
+      document.body.classList.remove('warper-ledger-print-open');
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -314,7 +317,7 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[150] bg-zinc-950/85 backdrop-blur-sm overflow-y-auto p-2 sm:p-4 md:p-6 print:p-0 print:m-0 print:bg-white print:static print:overflow-visible">
+    <div id="warper-ledger-print-modal-wrapper" className="fixed inset-0 z-[150] bg-zinc-950/85 backdrop-blur-sm overflow-y-auto p-2 sm:p-4 md:p-6 print:p-0 print:m-0 print:bg-white print:static print:overflow-visible">
       {/* Dynamic Print Page Style for Browser Print Dialog */}
       <style>{`
         @media print {
@@ -322,16 +325,36 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
             size: ${orientation === 'landscape' ? 'landscape' : 'portrait'};
             margin: 5mm;
           }
-          body, html {
-            width: 100% !important;
-            overflow: visible !important;
+          body.warper-ledger-print-open > #root > *:not(#warper-ledger-print-modal-wrapper) {
+            display: none !important;
           }
-          #pdf-warper-statement-container {
+          body.warper-ledger-print-open #pdf-statement-content,
+          body.warper-ledger-print-open [id^="pdf-"] {
+            display: none !important;
+          }
+          body.warper-ledger-print-open #pdf-warper-statement-container {
+            display: block !important;
+            visibility: visible !important;
             width: 100% !important;
             max-width: none !important;
             padding: 0 !important;
             margin: 0 !important;
             box-shadow: none !important;
+          }
+          body, html {
+            width: 100% !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            overflow: visible !important;
+          }
+          #warper-ledger-print-modal-wrapper {
+            display: block !important;
+            position: static !important;
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            overflow: visible !important;
           }
           #pdf-warper-statement-container table {
             width: 100% !important;

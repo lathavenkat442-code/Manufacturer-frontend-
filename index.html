@@ -90,6 +90,12 @@
             header, aside, nav, .print\:hidden, [class*="print:hidden"] {
                 display: none !important;
             }
+            body.warper-ledger-print-open > #root > *:not(#warper-ledger-print-modal-wrapper) {
+                display: none !important;
+            }
+            body.warper-ledger-print-open #pdf-statement-content {
+                display: none !important;
+            }
             @page {
                 size: auto;
                 margin: 6mm;
