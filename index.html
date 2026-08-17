@@ -90,22 +90,16 @@
             header, aside, nav, .print\:hidden, [class*="print:hidden"] {
                 display: none !important;
             }
-            body.warper-ledger-print-open > #root > *:not(#warper-ledger-print-modal-wrapper) {
-                display: none !important;
-            }
-            body.warper-ledger-print-open #pdf-statement-content {
-                display: none !important;
-            }
             @page {
                 size: auto;
-                margin: 6mm;
+                margin: 5mm;
             }
-            /* Guarantee standard tables fit full printable width of page */
-            #pdf-statement-content,
+            /* Standard tables fit full printable width of page */
             #pdf-supplier-statement,
             #pdf-warper-statement,
             #pdf-warper-statement-container,
             #pdf-warp-order-print-container,
+            #warp-order-print-document,
             #pdf-ledger-print-container,
             #pdf-statement-accounting,
             [id^="pdf-loom-statement-"],

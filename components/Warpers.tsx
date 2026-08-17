@@ -5407,7 +5407,7 @@ const Warpers: React.FC<WarpersProps> = ({
           initialEndDate={endDate}
           language={language}
           onClose={() => setPrintingWarperLedger(null)}
-          autoPrint={true}
+          autoPrint={false}
         />
       )}
       </div>
