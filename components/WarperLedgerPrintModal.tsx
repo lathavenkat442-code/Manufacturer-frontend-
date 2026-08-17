@@ -231,54 +231,51 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
     // Measure table's actual scroll width to guarantee zero cut-off
     const tableEl = printRef.current.querySelector('table');
     const actualWidth = tableEl ? Math.max(tableEl.scrollWidth, tableEl.offsetWidth, 1100) : 1100;
-    const captureWidth = actualWidth + 50;
+    const captureWidth = actualWidth + 40;
 
-      const opt = {
-        margin: [8, 8, 8, 8] as [number, number, number, number],
-        filename: filename,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          letterRendering: true,
-          backgroundColor: '#ffffff',
-          width: captureWidth,
-          windowWidth: captureWidth,
-          scrollX: 0,
-          scrollY: 0,
-          onclone: (clonedDoc: Document) => {
-            clonedDoc.body.style.width = `${captureWidth}px`;
-            clonedDoc.body.style.maxWidth = 'none';
-            clonedDoc.body.style.overflow = 'visible';
+    const opt = {
+      margin: [6, 6, 6, 6] as [number, number, number, number],
+      filename: filename,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        backgroundColor: '#ffffff',
+        width: captureWidth,
+        windowWidth: captureWidth,
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDoc: Document) => {
+          clonedDoc.body.style.width = `${captureWidth}px`;
+          clonedDoc.body.style.maxWidth = 'none';
+          clonedDoc.body.style.overflow = 'visible';
 
-            const el = clonedDoc.getElementById('pdf-warper-statement-container');
-            if (el) {
-              el.style.width = `${captureWidth}px`;
-              el.style.minWidth = `${captureWidth}px`;
-              el.style.maxWidth = 'none';
-              el.style.overflow = 'visible';
-              el.style.padding = '8px 12px';
-              el.style.boxShadow = 'none';
-            }
-            const wrappers = clonedDoc.querySelectorAll('.overflow-x-auto, .overflow-auto');
-            wrappers.forEach(w => {
-              if (w instanceof HTMLElement) {
-                w.style.overflow = 'visible';
-                w.style.width = '100%';
-                w.style.maxWidth = 'none';
-              }
-            });
+          const el = clonedDoc.getElementById('pdf-warper-statement-container');
+          if (el) {
+            el.style.width = `${captureWidth}px`;
+            el.style.minWidth = `${captureWidth}px`;
+            el.style.maxWidth = 'none';
+            el.style.overflow = 'visible';
+            el.style.padding = '6px 8px';
+            el.style.boxShadow = 'none';
           }
-        },
-        jsPDF: {
-          unit: 'pt',
-          format: 'a4',
-          orientation: orientation === 'portrait' ? ('portrait' as const) : ('landscape' as const)
-        },
-        pagebreak: {
-          mode: ['css', 'legacy']
+          const wrappers = clonedDoc.querySelectorAll('.overflow-x-auto, .overflow-auto');
+          wrappers.forEach(w => {
+            if (w instanceof HTMLElement) {
+              w.style.overflow = 'visible';
+              w.style.width = '100%';
+              w.style.maxWidth = 'none';
+            }
+          });
         }
-      };
+      },
+      jsPDF: {
+        unit: 'pt',
+        format: 'a4',
+        orientation: orientation === 'portrait' ? ('portrait' as const) : ('landscape' as const)
+      }
+    };
 
     try {
       await html2pdf().set(opt).from(printRef.current).save();
@@ -359,21 +356,11 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
             table-layout: auto !important;
             border-collapse: collapse !important;
           }
-          #pdf-warper-statement-container tbody tr {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            page-break-after: auto !important;
-            break-after: auto !important;
-          }
           #pdf-warper-statement-container thead {
             display: table-header-group !important;
           }
           #pdf-warper-statement-container tfoot {
             display: table-footer-group !important;
-          }
-          .avoid-break {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -610,7 +597,6 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
                     <tr 
                       key={txn.id || idx} 
                       className={`hover:bg-zinc-50 ${idx % 2 === 1 ? 'bg-zinc-50/70 print:bg-zinc-50' : 'bg-white'}`}
-                      style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
                     >
                       <td className={`border border-black ${isUltraDensity ? 'px-0.5 py-0.5 text-[8px]' : isHighDensity ? 'px-1 py-0.5 text-[9px]' : 'px-1.5 py-1 text-xs'} text-center font-bold text-black whitespace-nowrap`}>
                         {dateStr}
@@ -628,15 +614,6 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
                             {txn.billNumber && (
                               <div className="text-[10px] sm:text-xs font-bold text-zinc-600">
                                 {language === 'ta' ? 'பில் எண்' : 'Bill'}: #{txn.billNumber}
-                              </div>
-                            )}
-                            {txn.items && txn.items.length > 0 && (
-                              <div className="flex flex-col gap-0.5 mt-0.5">
-                                {txn.items.map((item: any, iIdx: number) => (
-                                  <div key={iIdx} className="text-[10px] sm:text-xs text-zinc-700 font-semibold">
-                                    {item.yarnType ? `${item.yarnType} ` : ''}{item.color} - {item.weightKg} kg
-                                  </div>
-                                ))}
                               </div>
                             )}
                           </div>
@@ -760,16 +737,16 @@ export const WarperLedgerPrintModal: React.FC<WarperLedgerPrintModalProps> = ({
         </div>
 
         {/* Footer / Signatures */}
-        <div className="mt-8 pt-6 border-t border-zinc-300 flex justify-between items-end text-xs font-bold text-black print:mt-8 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+        <div className="mt-6 pt-4 border-t border-zinc-300 flex justify-between items-end text-xs font-bold text-black print:mt-6">
           <div className="text-center min-w-[160px]">
-            <div className="h-10"></div>
+            <div className="h-8"></div>
             <div className="border-t border-black pt-1 uppercase">
               {language === 'ta' ? 'வார்ப்புகாரர் கையொப்பம்' : 'Warper Signature'}
             </div>
           </div>
 
           <div className="text-center min-w-[160px]">
-            <div className="h-10"></div>
+            <div className="h-8"></div>
             <div className="border-t border-black pt-1 uppercase">
               {language === 'ta' ? 'உரிமையாளர் கையொப்பம்' : 'Authorized Signature'}
             </div>
